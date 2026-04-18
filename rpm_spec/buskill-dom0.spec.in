@@ -1,0 +1,120 @@
+Name: qubes-buskill-dom0
+Version: @VERSION@
+Release: @REL@%{?dist}
+
+Summary: Qubes BusKill package for dom0
+License: GPLv2+
+URL: https://www.buskill.in/
+
+Source0: %{name}-%{version}.tar.gz
+
+BuildArch: noarch
+BuildRequires: make
+
+Requires: python3-qubesadmin
+Requires: qubes-core-admin-client
+Requires: qubes-mgmt-salt-dom0
+
+%description
+BusKill is a dead man's switch designed to protect your computer if it is
+physically seized. You connect one end of a USB cable to your laptop and attach
+the other end to your body (e.g. a belt loop). If someone snatches your laptop
+and runs, the cable disconnects and BusKill automatically triggers a security
+response: locking the screen, rebooting, or destroying encryption keys, before
+an attacker can access your data.
+
+For more information about BusKill, visit https://www.buskill.in/.
+
+This package contains files for dom0: Salt formulas, RPC endpoints, udev rules,
+desktop shortcuts, and keyboard bindings for disarming BusKill, as well as
+orchestration of the installation across dom0, TemplateVMs, and setting up the
+USB qube via Salt.
+
+%prep
+%setup -q
+
+%install
+make install-dom0 DESTDIR=$RPM_BUILD_ROOT
+
+%post
+# qubesctl wrapper (remove ANSI escape sequences and fold long lines to not
+# corrupt the output during `qubesctl` runs, and preserve the exit code of
+# qubesctl itself). The sed pattern removes:
+# - "\x1b\[": ESC [
+# - "[0-9;]*": parameter bytes
+# - "[A-Za-z]": final byte identifying the sequence type
+qubesctl() { command qubesctl "$@" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | fold -s -w 78; return ${PIPESTATUS[0]}; }
+
+USB_QUBE=$(/usr/bin/buskill-get-usb-qube)
+for file in \
+    /etc/qubes/policy.d/80-buskill.policy \
+    /usr/share/applications/buskill-disarm.desktop \
+    /usr/bin/buskill-selfdestruct; do
+    sed -i "s/@USB_VM@/${USB_QUBE}/g" "$file"
+done
+
+qubesctl top.enable buskill || exit 1
+qubesctl state.apply buskill-dom0 pillar="{\"usb_vm\": \"${USB_QUBE}\"}" || exit 1
+
+# Target specifically Debian and Fedora TemplateVMs. This could also be done
+# directly in buskill.sls, but would require starting management VMs even for
+# the unsupported TemplateVMs, and the installation can already take enough
+# time.
+SUPPORTED_TEMPLATEVMS=$(python3 -c "
+import re
+import qubesadmin
+qapp = qubesadmin.Qubes()
+supported_templatevms = [vm.name for vm in qapp.domains.values()
+         if vm.klass == 'TemplateVM'
+         and re.match(r'^(debian|fedora)-[0-9]', vm.name)]
+print(','.join(supported_templatevms))
+")
+if [ -n "$SUPPORTED_TEMPLATEVMS" ]; then
+    qubesctl --skip-dom0 --targets "$SUPPORTED_TEMPLATEVMS" state.apply buskill pillar="{\"usb_vm\": \"${USB_QUBE}\"}" || exit 1
+else
+    echo "BusKill requires that a Debian or Fedora TemplateVM is installed."
+    echo "Install it first, then reinstall BusKill again."
+    exit 1
+fi
+
+echo "BusKill installation complete. Restart the \"${USB_QUBE}\" qube and your interface qubes or reboot your computer for the changes to take effect." | fmt -w 72
+
+%preun
+# qubesctl wrapper; see %post for details
+qubesctl() { command qubesctl "$@" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | fold -s -w 78; return ${PIPESTATUS[0]}; }
+
+USB_QUBE=$(/usr/bin/buskill-get-usb-qube)
+
+qubesctl top.disable buskill
+qubesctl state.apply buskill-dom0-uninstall
+
+# Target specifically Debian and Fedora TemplateVMs - see %post for details
+SUPPORTED_TEMPLATEVMS=$(python3 -c "
+import re
+import qubesadmin
+qapp = qubesadmin.Qubes()
+supported_templatevms = [vm.name for vm in qapp.domains.values()
+         if vm.klass == 'TemplateVM'
+         and re.match(r'^(debian|fedora)-[0-9]', vm.name)]
+print(','.join(supported_templatevms))
+")
+if [ -n "$SUPPORTED_TEMPLATEVMS" ]; then
+    qubesctl --skip-dom0 --targets "$SUPPORTED_TEMPLATEVMS" state.apply buskill-uninstall
+fi
+
+%files
+/etc/i3/config.d/buskill.conf
+/etc/qubes-rpc/buskill.selfDestruct
+/etc/qubes-rpc/qubes.HostState.Set
+/etc/qubes/policy.d/80-buskill.policy
+/srv/salt/buskill-dom0-uninstall.sls
+/srv/salt/buskill-dom0.sls
+/srv/salt/buskill-uninstall.sls
+/srv/salt/buskill.sls
+/srv/salt/buskill.top
+/usr/bin/buskill-get-usb-qube
+/usr/bin/buskill-selfdestruct
+/usr/share/applications/buskill-disarm.desktop
+
+%changelog
+@CHANGELOG@

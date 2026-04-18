@@ -1,0 +1,10 @@
+etc/buskill/buskill.lock.rules
+etc/buskill/buskill.rules
+etc/qubes-rpc/buskill.Disarm
+etc/qubes/rpc-config/buskill.Disarm
+etc/qubes-rpc/qubes.LockScreen
+lib/systemd/system-preset/80-buskill.preset
+lib/systemd/system/buskill.service
+usr/bin/buskill-disarm.sh
+usr/bin/buskill-lock-interface-qubes.sh
+usr/share/applications/buskill-disarm.desktop

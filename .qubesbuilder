@@ -1,11 +1,12 @@
 host:
   rpm:
     build:
-    - rpm_spec/skeleton-dom0.spec
+    - rpm_spec/buskill-dom0.spec
+    - rpm_spec/buskill.spec
 vm:
   rpm:
     build:
-    - rpm_spec/skeleton-vm.spec
+    - rpm_spec/buskill-vm.spec
   deb:
     build:
     - debian

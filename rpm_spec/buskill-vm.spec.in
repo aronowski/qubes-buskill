@@ -1,0 +1,56 @@
+Name: qubes-buskill-vm
+Version: @VERSION@
+Release: @REL@%{?dist}
+
+Summary: Qubes BusKill package for VM
+License: GPLv2+
+URL: https://www.buskill.in/
+
+Source0: %{name}-%{version}.tar.gz
+
+BuildArch: noarch
+BuildRequires: make
+BuildRequires: systemd-rpm-macros
+
+%description
+BusKill is a dead man's switch designed to protect your computer if it is
+physically seized. You connect one end of a USB cable to your laptop and attach
+the other end to your body (e.g. a belt loop). If someone snatches your laptop
+and runs, the cable disconnects and BusKill automatically triggers a security
+response: locking the screen, rebooting, or destroying encryption keys, before
+an attacker can access your data.
+
+For more information about BusKill, visit https://www.buskill.in/.
+
+This package contains files for TemplateVMs (the USB qube and interface qubes):
+the BusKill service, udev rules, and trigger scripts
+
+%prep
+%setup -q
+
+%install
+make install-vm DESTDIR=$RPM_BUILD_ROOT SYSLIBDIR=/usr/lib
+
+%post
+%systemd_post buskill.service
+
+%preun
+%systemd_preun buskill.service
+
+%postun
+%systemd_postun_with_restart buskill.service
+
+%files
+/etc/buskill/buskill.lock.rules
+/etc/buskill/buskill.rules
+/etc/qubes-rpc/buskill.Disarm
+/etc/qubes/rpc-config/buskill.Disarm
+/etc/qubes-rpc/qubes.LockScreen
+/usr/bin/buskill-disarm.sh
+/usr/bin/buskill-lock-interface-qubes.sh
+/usr/lib/systemd/system-preset/80-buskill.preset
+/usr/lib/systemd/system/buskill.service
+/usr/share/applications/buskill-disarm.desktop
+
+%changelog
+@CHANGELOG@

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ $# -ne 1 ]; then
+    echo "This RPC requires 1 argument"
+    exit 1
+fi
+
+case "$1" in
+"lock-screen")
+    loginctl lock-sessions
+    ;;
+*) echo "Unknown option: $1" ; exit 1 ;;
+esac
+
+exit 0

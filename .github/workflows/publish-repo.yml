@@ -1,0 +1,156 @@
+name: Publish package repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up gh-pages worktree
+        run: |
+          git fetch origin gh-pages 2>/dev/null || true
+          if git show-ref --quiet refs/remotes/origin/gh-pages; then
+            git branch gh-pages origin/gh-pages
+            git worktree add pages gh-pages
+          else
+            git worktree add --orphan -b gh-pages pages
+          fi
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y createrepo-c apt-utils gpg rpm
+
+      - name: Import signing key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "GPG_KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5; exit}')" \
+            >> "$GITHUB_ENV"
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p assets
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --dir assets/ \
+            --pattern "*.rpm" \
+            --pattern "*.deb"
+
+      - name: Sign RPM packages
+        run: |
+          printf '%%_gpg_name %s\n%%_gpg_sign_cmd_extra_args --batch --pinentry-mode loopback\n' \
+            "$GPG_KEY_ID" >> ~/.rpmmacros
+          for rpm in assets/*.rpm; do
+            [ -f "$rpm" ] || continue
+            rpmsign --addsign "$rpm"
+          done
+
+      - name: Publish RPM packages
+        run: |
+          for rpm in assets/*.rpm; do
+            [ -f "$rpm" ] || continue
+            if echo "$(basename "$rpm")" | grep -qE '^qubes-buskill-vm'; then
+              dest=pages/rpm/vm/Packages
+            else
+              dest=pages/rpm/dom0/Packages
+            fi
+            mkdir -p "$dest"
+            cp "$rpm" "$dest/"
+          done
+          for dir in pages/rpm/dom0 pages/rpm/vm; do
+            [ -d "$dir/Packages" ] || continue
+            createrepo_c --update "$dir"
+            gpg --batch --yes --detach-sign --armor \
+              --local-user "$GPG_KEY_ID" "$dir/repodata/repomd.xml"
+          done
+
+      - name: Publish DEB packages
+        run: |
+          for deb in assets/*.deb; do
+            [ -f "$deb" ] || continue
+            mkdir -p pages/deb/pool/main/q/qubes-buskill-vm
+            cp "$deb" pages/deb/pool/main/q/qubes-buskill-vm/
+          done
+          ls pages/deb/pool/main/q/qubes-buskill-vm/*.deb 2>/dev/null || exit 0
+          mkdir -p pages/deb/dists/trixie/main/binary-amd64
+          (cd pages/deb && apt-ftparchive packages pool) \
+            > pages/deb/dists/trixie/main/binary-amd64/Packages
+          gzip -k -f pages/deb/dists/trixie/main/binary-amd64/Packages
+          (cd pages/deb && apt-ftparchive -c "$GITHUB_WORKSPACE/contrib/apt-ftparchive.conf" \
+            release dists/trixie) > pages/deb/dists/trixie/Release
+          gpg --batch --yes --local-user "$GPG_KEY_ID" \
+            --clearsign -o pages/deb/dists/trixie/InRelease \
+            pages/deb/dists/trixie/Release
+          gpg --batch --yes --local-user "$GPG_KEY_ID" \
+            --detach-sign --armor \
+            -o pages/deb/dists/trixie/Release.gpg \
+            pages/deb/dists/trixie/Release
+
+      - name: Export public signing key
+        run: |
+          gpg --armor --export "$GPG_KEY_ID" > pages/RPM-GPG-KEY-qubes-buskill
+          touch pages/.nojekyll
+
+      - name: Generate directory index
+        run: |
+          generate_index() {
+            local dir="$1"
+            local rel="${dir#pages}"
+            [ -n "$rel" ] || rel="/"
+            {
+              printf '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+              printf '<title>Index of %s</title>\n' "$rel"
+              printf '</head>\n<body>\n<h1>Index of %s</h1>\n<table>\n' "$rel"
+              if [ "$rel" != "/" ]; then
+                printf '<tr><td><a href="../">..</a></td><td></td></tr>\n'
+              fi
+              for entry in "$dir"/*/; do
+                [ -d "$entry" ] || continue
+                name="$(basename "$entry")"
+                printf '<tr><td><a href="%s/">%s/</a></td><td></td></tr>\n' "$name" "$name"
+              done
+              for entry in "$dir"/*; do
+                [ -f "$entry" ] || continue
+                name="$(basename "$entry")"
+                case "$name" in index.html|.nojekyll) continue ;; esac
+                size="$(du -sh "$entry" 2>/dev/null | cut -f1)"
+                printf '<tr><td><a href="%s">%s</a></td><td>%s</td></tr>\n' "$name" "$name" "$size"
+              done
+              printf '</table>\n</body>\n</html>\n'
+            } > "$dir/index.html"
+            for subdir in "$dir"/*/; do
+              [ -d "$subdir" ] || continue
+              generate_index "$subdir"
+            done
+          }
+          generate_index pages
+
+      - name: Commit and push
+        working-directory: pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Publish ${TAG}"
+          git push origin HEAD:gh-pages

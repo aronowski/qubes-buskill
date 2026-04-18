@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+################################################################################
+# File:    buskill.selfDestruct
+# Purpose: Self-destruct trigger script for BusKill Kill Cord
+#          For more info, see: https://buskill.in/
+# WARNING: THIS IS EXPERIMENTAL SOFTWARE THAT IS DESIGNED TO CAUSE PERMANENT,
+#          COMPLETE AND IRREVERSIBLE DATA LOSS!
+# Note   : This script will *not* execute unless it's passed the '--yes'
+#          argument. Be sure to test this trigger before depending on it!
+# Authors: Michael Altfield <michael@buskill.in>
+# Created: 2020-03-11
+# Updated: 2020-03-11
+# Version: 0.1
+################################################################################
+ 
+############
+# SETTINGS #
+############
+ 
+WHICH="/usr/bin/which"
+for util in cryptsetup ls cp mv ln mkdir mount cat grep echo awk head lsblk od chmod bash nohup sleep qvm-kill qvm-run poweroff chroot sync ldd xargs; do
+  var="${util//-/_}"
+  export ${var^^}=`${WHICH} ${util}` || echo "ERROR: Unable to find ${util}"
+done
+
+if [[ "$(${QVM_RUN} --no-gui --pass-io @USB_VM@ '[ -f /usr/bin/buskill-lock-interface-qubes.sh ] && echo OK')" != "OK" ]]; then
+  ${ECHO} "ERROR: Unable to find script to lock all interface qubes"
+  exit 1
+fi
+ 
+CHROOT_PATH='/dev/shm/buskill/chroot'
+DIE_SCRIPT='/usr/bin/die.sh'
+ 
+###########
+# CONFIRM #
+###########
+ 
+# for safety, exit if this script is executed without a '--yes' argument
+case "${@}" in
+  *"--yes"*) ;;
+  *) exit ;;
+esac
+if [ $? -ne 0 ]; then
+  ${ECHO} "WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING"
+  ${ECHO} "================================================================================"
+  ${ECHO} "WARNING: THIS IS EXPERIMENTAL SOFTWARE THAT IS DESIGNED TO CAUSE PERMANENT,  COMPLETE AND IRREVERSIBLE DATA LOSS!"
+  ${ECHO} "================================================================================"
+  ${ECHO} "WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING"
+  ${ECHO}
+  ${ECHO} "cowardly refusing to execute without the '--yes' argument for your protection. If really you want to proceed with damaging your system, retry with the '--yes' argument"
+  exit 1
+fi
+ 
+###########################
+# (DELAYED) HARD SHUTDOWN #
+###########################
+ 
+# The most secure encrypted computer is an encrypted computer that is *off*
+# This is our highest priority; initiate a hard-shutdown to occur in 1
+# minute regardless of what happens later in this script
+ 
+${NOHUP} ${SLEEP} 60 && ${ECHO} o > /proc/sysrq-trigger &
+${NOHUP} ${SLEEP} 61 && ${POWEROFF} --poweroff --no-sync --no-wall --force &
+${NOHUP} ${SLEEP} 62 && shutdown -h now &
+ 
+###############
+# LOCK SCREEN #
+###############
+ 
+# first action: lock the screen!
+${QVM_RUN} --no-gui --pass-io @USB_VM@ '/usr/bin/buskill-lock-interface-qubes.sh' &
+ 
+################
+# KILL ALL VMs #
+################
+ 
+# doing this sooner will decrease the time needed to hard shutdown later
+# See https://github.com/QubesOS/qubes-issues/issues/5887
+${QVM_KILL} --all &
+ 
+#####################
+# WIPE LUKS VOLUMES #
+#####################
+ 
+# overwrite luks headers
+${ECHO} "INFO: shredding LUKS header (plaintext metadata and keyslots with encrypted master decryption key)"
+writes=''
+oldIFS="${IFS}"
+IFS=$'\n'
+for line in $( ${LSBLK} --list --output 'UUID,FSTYPE' | ${GREP} 'crypt' ); do
+ 
+  device="/dev/disk/by-uuid/`${ECHO} \"${line}\" | ${AWK} '{print \$1}'`"
+  ${ECHO} -e "\t${device}"
+ 
+  ###########################
+  # OVERWRITE LUKS KEYSLOTS #
+  ###########################
+ 
+  # erases all keyslots, making the LUKS container "permanently inaccessible"
+  ${CRYPTSETUP} luksErase --batch-mode "${device}" || ${HEAD} --bytes 20M /dev/urandom > ${device} &
+ 
+  # store the pid of the above write tasks so we can try to wait for it to
+  # flush to disk later -- before triggering a brutal hard-shutdown
+  writes="${writes} $!"
+ 
+  #####################################
+  # OVERWRITE LUKS PLAINTEXT METADATA #
+  #####################################
+ 
+  luksVersion=`${OD} --skip-bytes 6 --read-bytes 2 --format d2 --endian=big --address-radix "n" "${device}"`
+ 
+  # get the end byte to overwrite. For more info, see:
+  # https://security.stackexchange.com/questions/227359/how-to-determine-start-and-end-bytes-of-luks-header
+  if [[ $luksVersion -eq 1 ]]; then
+    # LUKS1: https://gitlab.com/cryptsetup/cryptsetup/-/wikis/LUKS-standard/on-disk-format.pdf
+ 
+    # in LUKS1, the whole header ends at 512 * the `payload-offset`
+    # this is actually more than we need (includes keyslots), but
+    # it's the fastest/easiest to bound to fetch in LUKS1
+    payloadOffset=`${OD} --skip-bytes 104 --read-bytes 4 --format d4 --endian=big --address-radix "n" "${device}"`
+    luksEndByte=$(( 512 * ${payloadOffset} ))
+ 
+  elif [[ $luksVersion -eq 2 ]]; then
+    # LUKS2: https://gitlab.com/cryptsetup/LUKS2-docs/blob/master/luks2_doc_wip.pdf
+ 
+    # in LUKS2, the end of the plaintext metadata area is twice the
+    # size of the `hdr_size` field
+    hdr_size=`${OD} --skip-bytes 8 --read-bytes 8 --format d8 --endian=big --address-radix "n" "${device}"`
+    luksEndByte=$(( 2 * ${hdr_size} ))
+ 
+  else
+    # version unclear; just overwrite 20 MiB
+    luksEndByte=20971520
+ 
+  fi
+     
+  # finally, shred that plaintext metadata; we do this in a new file descriptor
+  # to prevent bash from truncating if ${device} is a file
+  exec 5<> "${device}"
+  ${HEAD} --bytes "${luksEndByte}" /dev/urandom >&5 &
+  writes="${writes} $!"
+  exec 5>&-
+done
+IFS="${oldIFS}"
+ 
+#######################
+# WAIT ON DISK WRITES #
+#######################
+ 
+# xargs is our leading/trailing whitespace trim() function
+writes=`${ECHO} "${writes}" | ${XARGS}`
+ 
+# wait until all the write tasks above have completed
+# note: do *not* put quotes around this arg or the whitespace will break wait
+# note: without the conditional, wait will wait indefinitely when $writes is empty
+if [[ ${writes} ]]; then wait ${writes}; fi
+ 
+# clear write buffer to ensure headers overwrites are actually synced to disks
+sync; echo 3 > /proc/sys/vm/drop_caches
+ 
+#################
+# CREATE CHROOT #
+#################
+ 
+# we have to create a ramfs chroot with cryptsetup, poweroff, and a few other
+# basic depends for after we luksSuspend our rootfs from under our feet
+ 
+for dir in proc sys dev pts bin lib64 lib/systemd usr/sbin usr/bin ; do
+  ${MKDIR} -p "${CHROOT_PATH}/${dir}"
+done
+ 
+${MOUNT} -t proc none "${CHROOT_PATH}/proc"
+${MOUNT} -t sysfs none "${CHROOT_PATH}/sys"
+${MOUNT} -o bind /dev "${CHROOT_PATH}/dev"
+${MOUNT} -o bind /dev/pts "${CHROOT_PATH}/dev/pts"
+ 
+# copy-in our binaries and their depends
+binaries="${BASH} ${CRYPTSETUP} ${ECHO} ${LS} ${NOHUP} ${SLEEP} ${XARGS} ${SYNC} ${POWEROFF}"
+for binary in ${binaries}; do
+  ${CP} -vf "${binary}" "${CHROOT_PATH}/${binary}"
+  libs="$( ${LDD} "${binary}" | ${GREP} -Eo '/lib.*\.so(\.[0-9]*)*' )"
+  for lib in ${libs}; do
+    ${CP} -vf "${lib}" "${CHROOT_PATH}/${lib}"
+  done
+done
+ 
+# fix around some libs and symlink issues
+${MV} "${CHROOT_PATH}/lib" "${CHROOT_PATH}/usr/lib"
+${LN} -s "usr/lib" "${CHROOT_PATH}/lib"
+ 
+${CAT} << EOF > "${CHROOT_PATH}/${DIE_SCRIPT}"
+#!${BASH}
+ 
+# let's give ourselves 10 more seconds to wipe luks keys from RAM
+${NOHUP} ${SLEEP} 10 && ${ECHO} o > /proc/sysrq-trigger &
+${NOHUP} ${SLEEP} 11 && ${POWEROFF} --poweroff --no-sync --no-wall --force &
+ 
+#################################
+# WIPE DECRYPTION KEYS FROM RAM #
+#################################
+ 
+# suspend each currently-decrypted LUKS volume
+${ECHO} "INFO: removing decryption keys from memory"
+waits=''
+for device in \$( ${LS} -1 "/dev/mapper" ); do
+ 
+  ${ECHO} -e "\t\${device}";
+  ${CRYPTSETUP} luksSuspend "\${device}" &
+ 
+  waits="\${waits} $!"
+ 
+done
+${ECHO} "INFO: finished luksSuspend calls"
+ 
+# xargs is our leading/trailing whitespace trim() function
+waits=`${ECHO} "\${waits}" | ${XARGS}`
+ 
+if [[ \${waits} ]]; then wait \${waits}; fi
+${ECHO} "INFO: finished waiting"
+ 
+# clear page caches in memory (again)
+sync; echo 3 > /proc/sys/vm/drop_caches
+${ECHO} "INFO: finished syncing"
+ 
+#############################
+# (IMMEDIATE) HARD SHUTDOWN #
+#############################
+${ECHO} "INFO: Powering Down"
+ 
+# do whatever works; this is important.
+${ECHO} o > /proc/sysrq-trigger &
+${SLEEP} 1
+${POWEROFF} --poweroff --no-sync --no-wall --force &
+EOF
+${CHMOD} +x "${CHROOT_PATH}/${DIE_SCRIPT}"
+ 
+# finally, enter the chroot and call the above die.sh script inside it
+${CHROOT} "${CHROOT_PATH}" "${DIE_SCRIPT}"

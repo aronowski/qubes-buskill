@@ -1,0 +1,14 @@
+[Unit]
+Description=Enable BusKill rules
+ConditionPathExists=/var/run/qubes-service/buskill
+After=systemd-udevd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/sh -c "ln -sfn /etc/buskill/buskill.rules /etc/udev/rules.d/buskill.rules && udevadm control --reload"
+ExecStop=/usr/bin/sh -c "unlink /etc/udev/rules.d/buskill.rules && udevadm control --reload"
+
+[Install]
+WantedBy=multi-user.target
+

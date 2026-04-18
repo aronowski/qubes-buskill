@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Disarm BusKill
+Exec=qvm-run -u root @USB_VM@ buskill-disarm.sh
+NoDisplay=true
