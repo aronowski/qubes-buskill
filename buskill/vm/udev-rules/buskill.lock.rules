@@ -1,0 +1,11 @@
+################################################################################
+# File:    @USB_VM@:/etc/buskill/buskill.rules -> /etc/udev/rules.d/buskill.rules
+# Purpose: Add buskill rules. For more info, see: https://buskill.in/qubes-os/
+# Authors: Michael Altfield <michael@buskill.in>
+# Created: 2020-01-02
+# License: GNU GPLv3
+################################################################################
+ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/buskill-lock-interface-qubes.sh"
+#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+soft-shutdown"
+#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+hard-reboot"
+#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm dom0 buskill.selfDestruct"

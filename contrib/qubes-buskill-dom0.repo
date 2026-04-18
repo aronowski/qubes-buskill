@@ -1,0 +1,11 @@
+# The GPG key needs to be imported manually. Clone this repo and perform the
+# following in dom0, assuming it's been cloned in the 'personal' qube:
+#
+# qvm-run --pass-io personal 'cat /home/user/qubes-buskill/contrib/RPM-GPG-KEY-qubes-buskill' > RPM-GPG-KEY-qubes-buskill
+# sudo rpm --import RPM-GPG-KEY-qubes-buskill
+
+[qubes-buskill-dom0]
+name=Qubes BusKill (dom0)
+baseurl=https://aronowski.github.io/qubes-buskill/rpm/dom0/
+enabled=1
+gpgcheck=1

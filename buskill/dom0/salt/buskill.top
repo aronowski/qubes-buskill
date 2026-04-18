@@ -1,0 +1,7 @@
+base:
+  dom0:
+    - match: nodegroup
+    - buskill-dom0
+  qubes:type:template:
+    - match: pillar
+    - buskill

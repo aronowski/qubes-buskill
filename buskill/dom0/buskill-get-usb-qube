@@ -1,0 +1,47 @@
+#!/usr/bin/python3
+
+# Based on the code snippet available at
+# https://github.com/QubesOS/qubes-desktop-linux-manager/blob/78bb7ba785280a5da1fce5347d7f7f5022a5bf5b/qubes_config/global_config/usb_devices.py
+# on the courtesy of:
+# The Qubes OS Project, http://www.qubes-os.org,
+# Marta Marczykowska-Górecka <marmarta@invisiblethingslab.com>
+# Benjamin Grande <ben@invisiblethingslab.com>,
+# Piotr Bartman-Szwarc <prbartman@invisiblethingslab.com>.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2.1 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License along
+# with this program; if not, see <http://www.gnu.org/licenses/>.
+
+import sys
+import qubesadmin
+from qubesadmin.device_protocol import DeviceCategory
+
+qapp = qubesadmin.Qubes()
+usb_qubes = set()
+
+# Get the qubes with assigned USB controllers, except AdminVM
+# In the context of BusKill, there's a separation of packaging between dom0 and
+# domUs. Having dom0 as the USB qube is unsupported.
+for vm in qapp.domains:
+    if vm.klass == 'AdminVM':
+        continue
+    for assignment in vm.devices["pci"].get_assigned_devices():
+        cats = [infc.category for infc in assignment.device.interfaces]
+        if DeviceCategory.PCI_USB in cats:
+            usb_qubes.add(vm.name)
+
+# At least one USB qube must exist for the script to succeed.
+if not usb_qubes:
+    sys.exit(1)
+
+# It's assumed that there's only one USB qube to hold the USB controllers
+print(next(iter(usb_qubes)))

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Disarm BusKill
+Exec=qrexec-client-vm @USB_VM@ buskill.Disarm
+NoDisplay=true

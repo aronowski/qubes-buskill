@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ $# -ne 1 ]; then
+    echo "This RPC requires 1 argument"
+    exit 1
+fi
+
+case "$1" in
+"lock-screen") loginctl lock-sessions ;;
+"soft-shutdown") shutdown -h now ;;
+"hard-shutdown") echo "Option $1 not implemented yet" ;;
+"soft-reboot") echo "Option $1 not implemented yet" ;;
+"hard-reboot") sudo bash -c "echo b > /proc/sysrq-trigger" ;;
+*) echo "Unknown option: $1" ; exit 1 ;;
+esac
+
+exit 0

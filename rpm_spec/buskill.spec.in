@@ -1,0 +1,39 @@
+Name: buskill
+Version: @VERSION@
+Release: @REL@%{?dist}
+
+Summary: Qubes BusKill metapackage
+License: GPLv2+
+URL: https://www.buskill.in/
+
+BuildArch: noarch
+
+Source0: %{name}-%{version}.tar.gz
+
+BuildRequires: make
+
+Requires: qubes-buskill-dom0
+
+%description
+BusKill is a dead man's switch designed to protect your computer if it is
+physically seized. You connect one end of a USB cable to your laptop and attach
+the other end to your body (e.g. a belt loop). If someone snatches your laptop
+and runs, the cable disconnects and BusKill automatically triggers a security
+response: locking the screen, rebooting, or destroying encryption keys, before
+an attacker can access your data.
+
+For more information about BusKill, visit https://www.buskill.in/.
+
+This is simply a metapackage that depends on `qubes-buskill-dom0`.
+
+%prep
+%setup -q
+
+%install
+make install-meta DESTDIR=$RPM_BUILD_ROOT
+
+%files
+/usr/share/doc/buskill/README.md
+
+%changelog
+@CHANGELOG@

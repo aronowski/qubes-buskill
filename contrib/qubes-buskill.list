@@ -1,0 +1,9 @@
+# To import the package signing key, copy the cloned repository to the
+# debian-13-xfce TemplateVM and run:
+#
+# gpg --dearmor < /home/user/qubes-buskill/contrib/RPM-GPG-KEY-qubes-buskill | sudo tee /usr/share/keyrings/qubes-buskill.gpg
+#
+# Yes, the RPM-GPG-KEY-qubes-buskill is not only for RPM packages.
+
+deb [signed-by=/usr/share/keyrings/qubes-buskill.gpg] https://aronowski.github.io/qubes-buskill/deb trixie main
+

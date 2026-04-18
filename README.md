@@ -1,539 +1,269 @@
-qubes-skeleton
-===
+# BusKill for Qubes OS
 
-A minimal reference package for Qubes OS components built with
-[qubes-builderv2](https://github.com/QubesOS/qubes-builderv2). Use it as a
-starting point when creating a new component, or as a reference for how the
-build system expects files to be laid out.
+## What is BusKill?
 
+BusKill is a dead man's switch designed to protect your computer if it is
+physically seized. You connect one end of a USB cable to your laptop and attach
+the other end to your body (e.g. a belt loop). If someone snatches your laptop
+and runs, the cable disconnects and BusKill automatically triggers a security
+response: locking the screen, rebooting, or destroying encryption keys, before
+an attacker can access your data.
 
-## Repository layout
+For more information about BusKill, visit https://www.buskill.in/.
 
-```
-qubes-skeleton/
-├── .qubesbuilder               # Tells qubes-builderv2 what to build and for which targets
-├── Makefile                    # install-dom0 / install-vm targets consumed by the spec/rules files
-├── README.dom0                 # Installed as /usr/lib/qubes/skeleton/README on dom0
-├── README.vm                   # Installed as /usr/lib/qubes/skeleton/README in VMs
-├── debian/                     # Debian packaging (VM distributions only)
-│   ├── changelog
-│   ├── compat
-│   ├── control
-│   ├── copyright
-│   ├── qubes-skeleton.install
-│   ├── rules
-│   └── source/
-│       └── format
-├── rel                         # Plain-text release/revision number (e.g. "1")
-├── rpm_spec/
-│   ├── skeleton-dom0.spec.in   # RPM spec template for the dom0 package
-│   └── skeleton-vm.spec.in     # RPM spec template for VM packages
-├── skeleton.sh                 # The actual payload installed by both packages
-└── version                     # Plain-text upstream version (e.g. "1.0.0")
-```
+## What is this repository?
 
+This repository provides files to build the Qubes OS packages that integrate
+BusKill into the Qubes security model. BusKill runs inside the USB qube
+(detected during the installation phase) so that udev events generated when the
+cable disconnects are handled in an isolated domain. The trigger communicates
+back to dom0 via Qubes RPC to take the configured action.
 
-## File-by-file guide
+The following packages are built:
 
-### `.qubesbuilder`
+- `qubes-buskill-dom0`: files for dom0: Salt formulas, RPC endpoints, udev
+  rules, desktop shortcuts, and keyboard bindings for disarming BusKill, as
+  well as orchestration of the installation across dom0, TemplateVMs, and
+  setting up the USB qube via Salt.
+- `qubes-buskill-vm`: files for TemplateVMs (the USB qube and interface qubes):
+  the BusKill service, udev rules, and trigger scripts,
+- `buskill`: metapackage that depends on `qubes-buskill-dom0`
 
-Declares what qubes-builderv2 should build and for which host/VM targets.
-Each top-level key (`host`, `vm`) maps to a set of distribution types
-(`rpm`, `deb`, etc.). Under `build:` list the spec/recipe files to use.
+## Installation
 
-```yaml
-host:
-  rpm:
-    build:
-    - rpm_spec/skeleton-dom0.spec   # built for dom0 (host) RPM distributions
-vm:
-  rpm:
-    build:
-    - rpm_spec/skeleton-vm.spec     # built for VM RPM distributions
-  deb:
-    build:
-    - debian                        # built for VM Debian distributions
+### 1. Enable the Qubes OS contrib repository
+
+BusKill is available through the Qubes OS contrib repository. Follow the
+documentation at
+https://doc.qubes-os.org/en/latest/user/advanced-topics/installing-contributed-packages.html
+to enable it in dom0 before proceeding.
+
+### 2. Install the metapackage
+
+Run the command:
+
+```shell
+sudo qubes-dom0-update buskill
 ```
 
-The builder renders `*.spec.in` -> `*.spec` by substituting `@VERSION@`,
-`@REL@`, and `@CHANGELOG@` before the spec is used. For Debian, the
-`debian/changelog` is updated automatically.
+The post-install script will:
 
-### `version` and `rel`
+1. Enable the BusKill Salt top file and apply the dom0 Salt state, which
+   enables the BusKill service on the USB qube.
+2. Apply the VM Salt state inside TemplateVMs, which installs
+   `qubes-buskill-vm`.
+3. Print a notice when complete, reminding you to restart the USB qube (or
+   reboot) so the changes take effect.
 
-Plain-text files containing the upstream version and the package release
-number respectively. The builder reads them and substitutes them into
-`@VERSION@` and `@REL@` inside RPM spec templates and into the Debian
-`changelog`.
+After installation, restart the USB qube or reboot your computer.
 
-### `Makefile`
+## Disarming BusKill temporarily
 
-Contains `install-dom0` and `install-vm` targets. Each RPM spec's `%install`
-section and the Debian `rules` file call one of these with the appropriate
-`DESTDIR`. Add every file you want packaged to the appropriate target here,
-then list it in the corresponding spec `%files` section or `.install` file.
+A keyboard shortcut (`Ctrl+Shift+F`) is registered in dom0 to temporarily
+disarm BusKill for 30 seconds - for example, when you need to unplug and replug
+a USB device intentionally. The shortcut is configured for XFCE, KDE Plasma,
+and i3wm during package installation.
 
-> **Important:** Makefile recipe lines must be indented with a **tab** character,
-> not spaces. Most editors default to spaces so make sure yours inserts a real tab.
-> A space-indented recipe line causes `make: *** missing separator` errors.
+## Configuring the trigger
 
-```makefile
-install-common:
-	install -m 775 -D skeleton.sh $(DESTDIR)/usr/lib/qubes/skeleton/skeleton.sh
+By default, BusKill locks the screen when the cable is disconnected. You can
+change this by editing the udev rules file inside the USB qube.
 
-install-dom0: install-common
-	install -m 664 -D README.dom0 $(DESTDIR)/usr/lib/qubes/skeleton/README
+Open a terminal in the USB qube and edit the active rules file:
 
-install-vm: install-common
-	install -m 664 -D README.vm $(DESTDIR)/usr/lib/qubes/skeleton/README
+```shell
+sudo vim /etc/buskill/buskill.rules
 ```
 
-### `rpm_spec/` - RPM packaging
+The file contains one active line and three commented alternatives:
 
-Used when building for RPM-based distributions. Two spec templates are
-provided: one for dom0 (host) and one for VMs.
-
-**`rpm_spec/skeleton-dom0.spec.in`** - dom0 package:
-
-```spec
-%global debug_package %{nil}
-Name: qubes-skeleton-dom0
-Version: @VERSION@
-Release: @REL@%{?dist}
-
-Summary: Qubes Skeleton package for dom0
-License: GPLv2+
-URL: https://www.qubes-os.org/
-
-Source0: %{name}-%{version}.tar.gz
-
-BuildRequires: make
-
-%description
-Qubes Skeleton package for dom0.
-
-%prep
-%setup -q
-
-#%build
-#something to build?
-
-%install
-make install-dom0 DESTDIR=$RPM_BUILD_ROOT
-
-%files
-/usr/lib/qubes/skeleton/README
-/usr/lib/qubes/skeleton/skeleton.sh
-
-%changelog
-@CHANGELOG@
+```udev
+ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/buskill-lock-interface-qubes.sh"
+#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+soft-shutdown"
+#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+hard-reboot"
+#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm dom0 buskill.selfDestruct"
 ```
 
-**`rpm_spec/skeleton-vm.spec.in`** - VM package (identical structure, calls
-`install-vm` and uses a different package name):
+To switch triggers, comment out the active line and uncomment exactly one of
+the alternatives:
 
-```spec
-Name: qubes-skeleton-vm
-...
-%install
-make install-vm DESTDIR=$RPM_BUILD_ROOT
-...
+| Trigger                             | Effect                               |
+|-------------------------------------|--------------------------------------|
+| `buskill-lock-interface-qubes.sh`   | Lock screen (default)                |
+| `qubes.HostState.Set+soft-shutdown` | Graceful shutdown                    |
+| `qubes.HostState.Set+hard-reboot`   | Immediate hard reboot                |
+| `buskill.selfDestruct`              | **Wipe LUKS keys - more info below** |
+
+After editing, reload udev inside the USB qube:
+
+```shell
+udevadm control --reload
 ```
 
-The `%global debug_package %{nil}` line at the top disables the automatic
-generation of `-debuginfo` and `-debugsource` sub-packages. RPM generates
-those by default for packages that contain compiled binaries. For
-script-only packages there are no binaries, so the generated file list is
-empty and the build fails with:
+**Warning**: The `buskill.rules` file is the *active* trigger configuration.
+The `buskill.lock.rules` file is swapped in temporarily during the 30-second
+disarm window and always uses the lock-screen trigger regardless of your
+permanent configuration.
 
-```
-error: Empty %files file .../debugsourcefiles.list
-```
+**Warning**: BusKill will trigger on the removal of **any** USB device, e.g. a
+flash drive, mouse or keyboard. It's recommended that:
+- The [keyboard shortcut to disarm BusKill](#disarming-busKill-temporarily) be
+  used for a 30-second possibility to unplug a USB device without triggering
+  the security response, especially if any other response than the lock-screen
+  trigger is used,
+- Advanced users configure the rules to trigger only when a specific USB device
+  is removed, by following [this
+  guide](https://www.buskill.in/buskill-laptop-kill-cord-dead-man-switch/#software).
 
-Keep this line for any package that installs only scripts or data files.
-Remove it if the package ever builds and installs compiled binaries (RPM
-will then produce useful debug packages automatically).
+## Self-destruct disclaimer
 
-An alternative for pure script or data packages is to declare the package
-as architecture-independent instead:
+**⚠ WARNING: THE SELF-DESTRUCT TRIGGER CAUSES PERMANENT, COMPLETE, AND
+IRREVERSIBLE DATA LOSS.**
 
-```spec
-BuildArch: noarch
-```
+The self-destruct trigger (`buskill.selfDestruct`) is designed to make
+encrypted data permanently unrecoverable. **There is no undo.** Once the LUKS
+keyslots are overwritten, **no passphrase, recovery key, or forensic technique
+can recover the encrypted data.** This includes all your qubes, and personal
+files stored on that disk.
 
-`BuildArch: noarch` tells RPM the package contains no compiled binaries,
-which also prevents the empty debugsource error and additionally ensures the
-package is built once and installable on any architecture. Use this when the
-package truly has no arch-specific content. Keep `%global debug_package %{nil}`
-when you want to suppress debug sub-packages but still produce an arch-specific
-package.
+Before enabling the self-destruct trigger:
 
-The placeholders replaced by the builder before the spec is used are:
+- Make sure you have current, tested backups of everything you cannot afford to
+  lose, stored on a separate device,
+- Test that the trigger configuration is syntactically correct by inspecting
+  the rules file carefully before relying on it,
+- Understand that any accidental disconnection of the BusKill cable (e.g. a
+  loose connector, a bump, or pulling on the cable by mistake) will destroy all
+  of your data in about 5 seconds,
+- We strongly recommend that you first fully test the self-destruct trigger on
+  a disposable machine containing no valuable data before relying on it.
 
-| Placeholder    | Replaced with                           |
-|----------------|-----------------------------------------|
-| `@VERSION@`    | contents of `version`                   |
-| `@REL@`        | contents of `rel`                       |
-| `@CHANGELOG@`  | auto-generated changelog from git log   |
+This trigger is intended for high-threat environments where the risk of
+unrecoverable data loss is preferable to the risk of an adversary accessing
+your plaintext data. Do not enable it unless you have fully evaluated this
+trade-off.
 
-`Source0` must be `%{name}-%{version}.tar.gz` - the builder creates this
-tarball automatically from the source tree.
+Please note that the self-destruct mechanism is meant to overwrite the LUKS
+keyslots. This option will **not** wipe anything (and **all of your laptop's
+data will remain intact, entirely exposed to an attacker that steals your
+laptop**) if your laptop is configured without LUKS FDE.
 
-Every file installed by the `%install` step must also be listed under
-`%files`, otherwise the build fails with an unpackaged files error. If a
-file should only be present on some architectures or conditionally included,
-use RPM conditionals (`%ifarch`, `%if`) inside `%files`.
+## Additional disclaimers and warnings
 
-### `debian/` - Debian packaging
+### "Denied" notifications
 
-Used when building for Debian-based VM distributions (e.g. `vm-bookworm`,
-`vm-trixie`). The key files are:
+Various notifications may pop-up about denied RPCs:
+- `Denied admin.vm.List from fedora-43-xfce to dom0`: during the installation
+  process,
+- `Denied qubes.Lockscreen+lock-screen from sys-usb to sys-gui`: during the
+  dead man's switch disconnecting
 
-**`debian/control`** - source and binary package metadata:
+These are typically harmless, and appear due to not granting the permission to
+list running qubes, and as a natural consequence, trying to lock all interface
+qubes, even those that do not exist (listing them is not permitted to reduce
+the USB qube's attack surface).
 
-```
-Source: qubes-skeleton
-Section: admin
-Priority: optional
-Maintainer: Your Name <you@example.com>
-Build-Depends: debhelper (>= 10), make
-Standards-Version: 4.4.0.1
-Homepage: https://www.qubes-os.org
+### X11 exclusive lock
 
-Package: qubes-skeleton
-Architecture: all
-Depends: ${misc:Depends}
-Description: Qubes skeleton VM package
- Example component for Qubes OS.
-```
+The screen may not lock when the dead man's switch disconnects if a menu is
+active from right-clicking on a window decoration or on the desktop, or if any
+other X11 window holding an X11 exclusive lock is present.
 
-**`debian/rules`** - the build and install script, typically a thin wrapper
-around the Makefile:
+### Desktop environment or interface qube installed after BusKill
 
-```makefile
-#!/usr/bin/make -f
+When the BusKill packaging is installed first, then a new desktop environment
+is installed, and its initial configuration is created, that initial
+configuration may override the disarm hotkey. For example:
 
-export DESTDIR=$(shell pwd)/debian/tmp
+- XFCE is preinstalled
+- BusKill packaging is installed, hotkeys are created for XFCE, KDE Plasma and
+  i3wm
+- i3wm is being installed
+- the user logs out of XFCE, logs into the i3wm session and creates the i3wm
+  initial configuration
+- the BusKill configuration has been overwritten and disarm hotkey isn't
+  present
 
-%:
-	dh $@
+If this happens, either reinstall the `buskill` package or setup the hotkey
+manually.
 
-override_dh_auto_install:
-	make install-vm
-```
+The same is applicable when a new interface qube is provisioned, e.g. switching
+from dom0 to sys-gui after the BusKill configuration has been deplyed.
 
-**`debian/changelog`** - version history in the standard Debian format. The
-builder updates the version automatically so only an initial entry is needed:
+### USB qube unresponsive or terminated
 
-```
-qubes-skeleton (1.0.0-1) unstable; urgency=medium
+The way BusKill operates is that when the cable is disconnected, the USB qube
+sends a request to dom0 to lock the screen, reboot, shut down or destroy the
+LUKS header. This is **not** implemented as a heartbeat, which when stopped,
+performs the security response. On the contrary, the USB qube must be
+operational for the request to be sent. This may result in the following:
 
-  * Initial release.
+- If the USB qube is slow to respond, the security operation will be performed
+  with a delay,
+- If it's completely unresponsive or shuts down, the operation will never be
+  triggered.
 
- -- Your Name <you@example.com>  Thu, 01 Jan 2026 00:00:00 +0000
-```
+It's recommended to ensure that the USB qube has enough resources (assigned
+memory and VCPUs) to partially mitigate the issue.
 
-**`debian/compat`** - debhelper compatibility level (use `10` or higher):
+## Uninstallation
 
-```
-10
-```
+Run in dom0:
 
-**`debian/source/format`** - Debian source format:
-
-```
-3.0 (quilt)
-```
-
-**`debian/qubes-skeleton.install`** - lists files to include in the binary
-package (paths relative to `DESTDIR`):
-
-```
-usr/lib/qubes/skeleton/skeleton.sh
-usr/lib/qubes/skeleton/README
-```
-
-**`debian/copyright`** - license declaration in the machine-readable DEP-5
-format:
-
-```
-Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: qubes-skeleton
-Source: https://www.qubes-os.org/
-
-Files: *
-Copyright: 2026 Your Name <you@example.com>
-License: GPL-2+
- [license text...]
+```shell
+sudo dnf remove -y buskill
 ```
 
-### `README.dom0` / `README.vm`
+The pre-uninstall script disables the BusKill Salt top file, applies the
+uninstall Salt states to remove BusKill from dom0 and the USB qube
+TemplateVM, and stops any running BusKill services.
 
-Plain-text files installed as `/usr/lib/qubes/skeleton/README` on the
-relevant target. Replace these with whatever per-target documentation or
-runtime instructions your component needs.
+There's no need to restart the USB qube to complete the uninstallation process.
 
-### `skeleton.sh`
+## Further Reading
 
-The example payload. Replace or extend this with the scripts, binaries, or
-configuration files your component provides.
+- The [BusKill website](https://buskill.in) and
+  [documentation](https://docs.buskill.in),
+- [Using BusKill in Qubes OS](https://www.buskill.in/qubes-os/)
+- [Disarming BusKill in Qubes OS and how to setup the disarm hotkey
+  manually](https://www.buskill.in/qubes-disarm/)
+- [Bounty to provide an official Qubes OS contrib
+  package](https://www.buskill.in/qubes-package-bounty/), along with this
+  README,
+- [A deep dive into how the destruction of the LUKS keyslots
+  works](https://www.buskill.in/luks-self-destruct/),
+- [Qubes OS documentation](https://doc.qubes-os.org/), in particular:
+  - [Salt in Qubes
+    OS](https://doc.qubes-os.org/en/latest/user/advanced-topics/salt.html),
+  - [Interface
+    qubes](https://doc.qubes-os.org/en/latest/user/advanced-topics/gui-domain.html),
+  - [USB
+    qubes](https://doc.qubes-os.org/en/latest/user/advanced-topics/usb-qubes.html),
+  - [qrexec](https://doc.qubes-os.org/en/latest/developer/services/qrexec.html)
+    and [RPC
+    policies](https://doc.qubes-os.org/en/latest/user/advanced-topics/rpc-policy.html),
+  - [Installing contributed
+    packages](https://doc.qubes-os.org/en/latest/user/advanced-topics/installing-contributed-packages.html),
+  - [brief introduction to Qubes Builder
+    v2](https://doc.qubes-os.org/en/latest/developer/building/qubes-builder-v2.html).
 
+## License
 
-## Example: adding a new file
+Copyright (C) 2020-2026 Michael Altfield, Kamil Aronowski and the BusKill Team
 
-Suppose you want to install a new script `toto.sh` into both dom0 and VMs
-(RPM and Debian).
+The contents of this repo are under the GPL version 3 or later.
+In addition, any content other than code can also be used, at your
+choice, under CC-BY-SA version 4.0.
 
-**1. Create the file in the repository.**
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-```bash
-cat > toto.sh << 'EOF'
-#!/bin/bash
-echo "toto"
-EOF
-chmod +x toto.sh
-```
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
 
-**2. Add the install rule to `Makefile`.**
-
-```makefile
-install-common:
-	install -m 775 -D skeleton.sh $(DESTDIR)/usr/lib/qubes/skeleton/skeleton.sh
-	install -m 775 -D toto.sh   $(DESTDIR)/usr/lib/qubes/skeleton/toto.sh
-```
-
-**3. Add the path to the RPM spec files under `%files`.**
-
-In `rpm_spec/skeleton-dom0.spec.in` and `rpm_spec/skeleton-vm.spec.in`:
-
-```spec
-%files
-/usr/lib/qubes/skeleton/README
-/usr/lib/qubes/skeleton/skeleton.sh
-/usr/lib/qubes/skeleton/toto.sh
-```
-
-**4. Add the path to the Debian install file.**
-
-In `debian/qubes-skeleton.install`:
-
-```
-usr/lib/qubes/skeleton/skeleton.sh
-usr/lib/qubes/skeleton/README
-usr/lib/qubes/skeleton/toto.sh
-```
-
-**5. Commit the changes.**
-
-```bash
-git add toto.sh Makefile rpm_spec/skeleton-dom0.spec.in rpm_spec/skeleton-vm.spec.in debian/qubes-skeleton.install
-git commit -m "Add toto.sh"
-```
-
-That is all that is needed at the source level. The rest is handled by
-qubes-builderv2.
-
-
-## Local test build with qubes-builderv2
-
-> **Prerequisites:** Follow the setup instructions in the
-> [qubes-builderv2 README](https://github.com/QubesOS/qubes-builderv2/blob/main/README.md)
-> first - install dependencies, fetch submodules, and configure your executor
-> (Qubes disposable VM, Docker, or Podman).
-
-### 1. Clone qubes-builderv2
-
-```bash
-git clone https://github.com/QubesOS/qubes-builderv2
-cd qubes-builderv2
-git submodule update --init
-```
-
-### 2. Create `builder.yml`
-
-Start from the example config that matches your target release
-(`example-configs/qubes-os-r4.3.yml`) and narrow it down to just skeleton.
-Replace `/path/to/your/skeleton` with the absolute path to your local clone
-of this repository.
-
-```yaml
-# builder.yml
-git:
-  baseurl: https://github.com
-  prefix: fepitre/qubes-
-  branch: master
-  maintainers:
-  # fepitre's @qubes-os.org
-  - 9FA64B92F95E706BF28E2CA6484010B5CDC576E2
-  # fepitre's @invisiblethingslab.com
-  - 77EEEF6D0386962AEA8CF84A9B8273F80AC219E6
-
-executor:
-  type: qubes
-  options:
-    dispvm: qubes-builder-dvm   # your builder disposable template
-
-distributions:
-  - host-fc41      # adjust to the Fedora version your dom0 runs
-  - vm-fc42        # add RPM distributions as needed
-  - vm-bookworm    # add Debian distributions as needed
-
-components:
-  - skeleton:
-      branch: master
-      # Override the URL with a local path to your git clone.
-      # Note: the builder fetches the latest commit of `branch` from that
-      # local repo, so only committed changes are picked up. Uncommitted
-      # working-tree changes are ignored so commit first, then build.
-      url: /path/to/your/git/skeleton
-      # GPG fingerprint(s) used to verify signed tags for this component.
-      # When omitted, the keys from the top-level git.maintainers list are used.
-      # Setting this overrides those defaults for this component only.
-      maintainers:
-        - AABBCCDDEEFF00112233445566778899AABBCCDD
-      # verification-mode controls how the builder verifies the source.
-      # The default requires a signed tag on the fetched commit (most secure).
-      # "less-secure-signed-commits-sufficient" accepts a signed commit instead,
-      # which is useful during development when you haven't created a release tag yet.
-      verification-mode: less-secure-signed-commits-sufficient
-
-repository-publish:
-  components: current-testing
-
-stages:
-  - fetch
-  - prep
-  - build
-  - sign:
-      executor:
-        type: local
-  - publish:
-      executor:
-        type: local
-```
-
-### 3. Run the build pipeline
-
-Stages have declared dependencies that are resolved automatically:
-`fetch` is always run by the CLI before anything else, and `build` has an
-explicit job dependency on the `prep` artifact, so `get_jobs` pulls `prep`
-in automatically. In practice, calling `build` is sufficient for a full
-run from scratch:
-
-```bash
-./qb -c skeleton package build
-```
-
-You can also list stages explicitly if you only want to run up to a certain
-point:
-
-```bash
-./qb -c skeleton package fetch
-./qb -c skeleton package prep
-./qb -c skeleton package build
-```
-
-Once the build succeeds, optionally sign and publish:
-
-```bash
-# Sign - requires a GPG key configured in builder.yml
-./qb -c skeleton package sign
-
-# Publish to the local repository tree
-./qb -c skeleton package publish
-```
-
-Each stage is tracked via YAML artifact files under `artifacts/`. A stage is
-skipped if its artifact already exists. To force sources to be re-fetched, `fetch` 
-must be explicitly listed in the stage, otherwise the
-implicit fetch run skips the git pull:
-
-```bash
-./qb -c skeleton package fetch build
-```
-
-To re-run build stages, delete the relevant artifact file under
-`artifacts/components/skeleton/`.
-
-### 4. Inspect the built packages
-
-Artifacts are laid out as described in the qubes-builderv2 README:
-
-```bash
-# Built RPMs
-find artifacts/components/skeleton -name '*.rpm'
-
-# Built .deb packages
-find artifacts/components/skeleton -name '*.deb'
-
-# Published repository tree
-ls artifacts/repository-publish/
-```
-
-### 5. Install and verify
-
-#### dom0
-
-> **Warning:** dom0 is the most privileged and trusted component of Qubes OS.
-> Installing packages in dom0 that have not been signed and verified through
-> the official Qubes OS repository process is a security risk. Only do this
-> with packages you built yourself from source you fully trust, on a machine
-> you are comfortable treating as potentially compromised. **Proceed at your
-> own risk.**
-
-dom0 is isolated and cannot pull files directly from the builder qube. Copy
-the built RPM from the builder qube (`work-qubesos`) to dom0 using
-`qvm-run --pass-io`, then install it:
-
-```bash
-# Run in dom0
-# artifacts/repository/ always contains only the latest built version.
-# The build stage repopulates it on each run, so there is never more than
-# one RPM file per component version.
-qvm-run --pass-io work-qubesos \
-    'cat ~/qubes-builderv2/artifacts/repository/host-fc41/skeleton_*/qubes-skeleton-dom0-*.rpm' \
-    | sudo tee /tmp/qubes-skeleton-dom0.rpm > /dev/null
-
-sudo rpm -ivh /tmp/qubes-skeleton-dom0.rpm
-
-# Verify
-/usr/lib/qubes/skeleton/skeleton.sh
-/usr/lib/qubes/skeleton/toto.sh
-cat /usr/lib/qubes/skeleton/README
-```
-
-#### VM distributions (RPM and Debian)
-
-To test without modifying a template, install into either a freshly
-started disposable VM based on the target template, or a dedicated testing
-AppVM. Start the VM first, then copy the package to it with `qvm-copy-to-vm`
-from the builder qube and install inside it.
-
-**RPM-based (e.g. fedora-42):**
-
-```bash
-# Start a fresh dispvm based on fedora-42 or use a dedicated testing AppVM
-# (replace 'test-fedora-42' with the actual running VM name)
-qvm-copy-to-vm test-fedora-42 \
-    ~/qubes-builderv2/artifacts/repository/vm-fc42/skeleton_*/qubes-skeleton-vm-*.rpm
-
-# Inside the VM
-sudo rpm -ivh ~/QubesIncoming/work-qubesos/qubes-skeleton-vm-*.rpm
-/usr/lib/qubes/skeleton/skeleton.sh
-/usr/lib/qubes/skeleton/toto.sh
-cat /usr/lib/qubes/skeleton/README
-```
-
-**Debian-based (e.g. bookworm):**
-
-```bash
-# Start a fresh dispvm based on debian-12 or use a dedicated testing AppVM
-qvm-copy-to-vm test-bookworm \
-    ~/qubes-builderv2/artifacts/repository/vm-bookworm/skeleton_*/qubes-skeleton_*.deb
-
-# Inside the VM
-sudo dpkg -i ~/QubesIncoming/work-qubesos/qubes-skeleton_*.deb
-/usr/lib/qubes/skeleton/skeleton.sh
-/usr/lib/qubes/skeleton/toto.sh
-cat /usr/lib/qubes/skeleton/README
-```
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
