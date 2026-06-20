@@ -1,0 +1,16 @@
+Package: qubes-buskill-vm
+Architecture: all
+Version: 1.0.0-1+deb13u1
+Priority: optional
+Section: admin
+Maintainer: Qubes OS <user@qubes-os.org>
+Installed-Size: 32
+Filename: pool/main/q/qubes-buskill-vm/qubes-buskill-vm_1.0.0-1+deb13u1_all.deb
+Size: 3892
+MD5sum: 8f04b954666d79324a0312a1519f8c58
+SHA1: 80b3390e45791116a0d8febaa9135458bdb4b97c
+SHA256: d3cc89c2bd5a0677a8750a2a5cf1ce9d6b9ec6c3f2011cf63933cc06ca3d8a2a
+SHA512: 586aae9df32f604bf70202e64f2fef83331c505e21140c145cbc7741188f4e1a03b17c4b9dbb334ac885d9d63becf7610ae96c239e2eb71be0df8cbf9c42e845
+Homepage: https://www.qubes-os.org
+Description: Qubes BusKill VM package
+
