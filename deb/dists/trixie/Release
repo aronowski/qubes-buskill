@@ -1,24 +1,24 @@
 Architectures: amd64 all
 Codename: trixie
 Components: main
-Date: Sat, 04 Jul 2026 16:05:46 +0000
+Date: Sat, 04 Jul 2026 16:26:42 +0000
 Description: Qubes BusKill package repository
 Label: qubes-buskill
 Origin: qubes-buskill
 Suite: trixie
 MD5Sum:
- 549ae6f076b5d16531e028e0f65d5e46              200 Release
+ efa6ca0d8a57ad2d5e7103183cc25f42              200 Release
  f6009ecf392b8779049195aafe6aa352              626 main/binary-amd64/Packages
- bcc17917e93ccfcb2b21e411f69b05af              446 main/binary-amd64/Packages.gz
+ 77de4f5d8acedf5e439fb8d0be7aa160              446 main/binary-amd64/Packages.gz
 SHA1:
- 43d9e6f39062d1d2b8c5b47b8c99c6b63be618df              200 Release
+ 34f484751cdc0cf41b130e89ab829c55b1420426              200 Release
  f0e645853fc86a52dac992a1ca3c5a268b2cfd17              626 main/binary-amd64/Packages
- f9f87b12939f6a5d1bc308c930cf2543d5563891              446 main/binary-amd64/Packages.gz
+ 17f7a4d02ff17a8f27a4b7da5804318808d92be1              446 main/binary-amd64/Packages.gz
 SHA256:
- 8d5324f5c3cf8a10854f12e90e6fc976133eb68201251025693c9cf1707a2742              200 Release
+ d7c2d70c56474059ae8100ff732357aafcce397be41df53ef4ef75cc7ccbf3a9              200 Release
  2e0fa12d031a1a2be9ff4cc267596909dd0725c7fa352044367c6c26e7c56a27              626 main/binary-amd64/Packages
- 1aef2737469ea11869197c324c6f35ea2087cd2094868e73ad6cea2b58b916a5              446 main/binary-amd64/Packages.gz
+ 1172af7bf366a70a4ba53b2a8864b5180658675170d3c218851b422ed7592b68              446 main/binary-amd64/Packages.gz
 SHA512:
- 263e5fdb95f2eeeb5c87e8c717b6457e38dcbdaa848f9c2580079fbe6fc0e3e24a189ef842bbef3b6edbc2b1dcf520dbc859cee714d0daab5062d1437591f487              200 Release
+ e7dab62fc60439d144d47cb0557d70c834bdc680685318a34e1de4070671a1304bedfb955a9d1cf426b61edd9cd625bf8c7f78c23107527dba34d4a08f24ce8e              200 Release
  0ad8b369e30aba02e11ab235a0a5c6605cc0cf8110584f4a42e653d5cac4af8f6559cf21f89207c3068b4951f1791a26f36886d57b02d9ac449be18314fd8a85              626 main/binary-amd64/Packages
- a545d1d9d27e1f9ec7196704bf052dd6fa575e0f30d196a879287930bba10bfaf7b9be3612a36b3fca554b4dd729bf2005fe065bd284338662a5eb5d5461d808              446 main/binary-amd64/Packages.gz
+ a6981c6b24c4e55b18ab13d9f2a87f50578f73a970e5f71ca0ec8a1d016f8dac636dfca730303e84366ab69107950b7456133261b010dcae12545ff3c755f040              446 main/binary-amd64/Packages.gz
