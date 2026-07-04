@@ -4,40 +4,40 @@ Hash: SHA512
 Architectures: amd64 all
 Codename: trixie
 Components: main
-Date: Sat, 04 Jul 2026 15:39:01 +0000
+Date: Sat, 04 Jul 2026 16:05:46 +0000
 Description: Qubes BusKill package repository
 Label: qubes-buskill
 Origin: qubes-buskill
 Suite: trixie
 MD5Sum:
- 34671e8b6d193fc81158d93b952d6ac7              200 Release
+ 549ae6f076b5d16531e028e0f65d5e46              200 Release
  f6009ecf392b8779049195aafe6aa352              626 main/binary-amd64/Packages
- 5748dd5c79580aea1d95693e35785abf              446 main/binary-amd64/Packages.gz
+ bcc17917e93ccfcb2b21e411f69b05af              446 main/binary-amd64/Packages.gz
 SHA1:
- d54825865b8c00d97ece1fcb162f522b213759db              200 Release
+ 43d9e6f39062d1d2b8c5b47b8c99c6b63be618df              200 Release
  f0e645853fc86a52dac992a1ca3c5a268b2cfd17              626 main/binary-amd64/Packages
- ca0fdd911059a453103ca753cc1fb1eaf8b2cc6d              446 main/binary-amd64/Packages.gz
+ f9f87b12939f6a5d1bc308c930cf2543d5563891              446 main/binary-amd64/Packages.gz
 SHA256:
- 9500bc1d3657fa37b2901db084effafcc8210a017bd6aa4220bff7a9e6dfc737              200 Release
+ 8d5324f5c3cf8a10854f12e90e6fc976133eb68201251025693c9cf1707a2742              200 Release
  2e0fa12d031a1a2be9ff4cc267596909dd0725c7fa352044367c6c26e7c56a27              626 main/binary-amd64/Packages
- 8f5057b9852e46bf8e40bc5eac87e0e890d3ccf8d474c0c55bc10b466ebe803a              446 main/binary-amd64/Packages.gz
+ 1aef2737469ea11869197c324c6f35ea2087cd2094868e73ad6cea2b58b916a5              446 main/binary-amd64/Packages.gz
 SHA512:
- 3e3fb0460939cb0e8b24086c01454d49031fd53c8647980997bf0442314c2bd1b03dea9accb4b3f97ffe50fb4bb0b42d4c425b784d7909665261e6d2bea07255              200 Release
+ 263e5fdb95f2eeeb5c87e8c717b6457e38dcbdaa848f9c2580079fbe6fc0e3e24a189ef842bbef3b6edbc2b1dcf520dbc859cee714d0daab5062d1437591f487              200 Release
  0ad8b369e30aba02e11ab235a0a5c6605cc0cf8110584f4a42e653d5cac4af8f6559cf21f89207c3068b4951f1791a26f36886d57b02d9ac449be18314fd8a85              626 main/binary-amd64/Packages
- 1130daa156d4eb452e37121a3a4b836b9a819dd575b248d94ee4736266608e755c21e970d994fe81cf9ce6422154f8228fed637b01e1084384de04a5d09c8f26              446 main/binary-amd64/Packages.gz
+ a545d1d9d27e1f9ec7196704bf052dd6fa575e0f30d196a879287930bba10bfaf7b9be3612a36b3fca554b4dd729bf2005fe065bd284338662a5eb5d5461d808              446 main/binary-amd64/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iQIzBAEBCgAdFiEEshyZiqcXKGiF6lsYg6bw6P0zzcsFAmpJKRUACgkQg6bw6P0z
-zctRNQ//UWNzhu6hc3DSXZzqrjSgNc9HdbjX1PHM4BptaweDDAQjS+Rh1N1ExTsE
-hrVPQUkjE0/ZYpB5rcNkJuM1odYn6f45OKyfBzJ3VfF9wyMS1wuiBYWCLAIJ7xcX
-6cco7VUVU59UjBj3rNy+qpbS3wuky0Ye/fWiTmPgVQDksPd0nnDfZz4rJPMqomTh
-gBeE1lLNnPeDzhHcwtG0vXrhRIonyunV+pS8mjDybggK3vwnJlo2AqTnBuuuRq6w
-6AKl28+zm3CdX8JH8cXZZ62Run7KNoHVl/eJBBS/Nm0YV4jh9yESfcw1TbP+R3oA
-bi8njku5DhQ0UyWiSNo8bWGlADB72oKqF3KcuNT3f2a4+DtRwFWU0et8izcD1rlp
-1kHU3qYPBNtSq1ZXTkyS/I5flAnYqAfLXFac/GefAs6A3nfMgDxiHjf2CYQ3tY19
-YzPQ1Q+gy5+T36LPZ1OuQJrhghJFa8KBI1Tq0mJG2Bvj8Zz16xvwOyyTozzyM6yY
-aae2a5Zm6n+asH8PzJ4bW89dnIkDekMHA60KAZQRUI9MVAfEsJz5sacEY+kwG2LG
-v082xaRVIcqtry2GNiMRIIvDwn+T+7J/6JOlP5Jcc/TxhTvtCwrFvXH6wNo077GK
-lem65CHTKj2V1rafww58YDUi0rHNiKV80tEUDVkdymSYLHC6cis=
-=Y9FX
+iQIzBAEBCgAdFiEEshyZiqcXKGiF6lsYg6bw6P0zzcsFAmpJL1oACgkQg6bw6P0z
+zctGMg/+KfPeGARB1hZ/ZT5aihzRSVCWvCxtoZ4a/COrCnGvsnKgiVkcVZstin4B
+T1q441FKjrTQjPcm5Qqz8vq1V+sZtL+fE+QLhj9cGwXIKp4CO1OGOL5WQ6y+WI+2
+YBK8PJGl89NI+KBxN34sJeHpZNZ8iMjhL4TiNEikHssYdkqVksjMUMCOkXtXUYXb
+PcpZuJ66j3QEEe3xVplfrYOgyieO1NzeuVRWIIyYs/OhFZuZr+devoSY2c02TOs4
+SCHep2l4qvU3PdRkV83zaNQGdSToCYNAYSWEkwkd88OJJMT2DWS4Ra52ssP74Xdf
+QrsVBYwvry54yDWEgn+1qM03OkGyNWMIBX1tcGDy43d/x/UZmXhBYQt05kKPSxKm
+bBCzSuZ9K675aIjbChr/Optylk0tcShn53wLGKMLUYVY/WjBmYHoxOyb0FXLrlyN
+ZiMBH2WnCJTurmCMNpE142heFgAswjz1T3wWxzVZFyMpc9zRJ0Fms7f0AwE6kTYr
+wIjeODzuw+ZuZqE2UsgakYv3lZfGTky8sZRXXugAQMNqLYdbwvbHO/s46IMrNWKf
+UTUYG0EDJOuiq+v338fWJbHKQ9tNJ6RMMh3yczQaT0z5zwzQxWghmyzpQylN07wc
+zDxGu4zsk77QcTEKnrVVRAgPgRgRIiRRwBLSYh0ueyCIErkWFC0=
+=Zd8P
 -----END PGP SIGNATURE-----
