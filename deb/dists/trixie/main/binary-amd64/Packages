@@ -4,13 +4,13 @@ Version: 1.0.0-1+deb13u1
 Priority: optional
 Section: admin
 Maintainer: Michael Altfield and the BusKill Team <releases@buskill.in>
-Installed-Size: 29
+Installed-Size: 35
 Filename: pool/main/q/qubes-buskill-vm/qubes-buskill-vm_1.0.0-1+deb13u1_all.deb
-Size: 4012
-MD5sum: def18e3fb4a0421f68105d7d5779781a
-SHA1: 37e70912ab09493eb3b36403e0685641776a2638
-SHA256: de478e30c2db7ce86d79debe98fca5c15bd13de36caa6b06f517b67fc503b805
-SHA512: 593e60451fb7d11e138c582d8ea4454e47921c5ccb4984d90abe5f433d445bc646288b123f1846184f517ad9e909044801c5e7147e47adadd40dfe5d2442643d
+Size: 4280
+MD5sum: 038ec139606667c5c232edcf8c706d0d
+SHA1: 86d7843c2fa4d0200bf518597d9f697b446b4074
+SHA256: 6f96ff66a9d6d98d47f923cef01c6083db05a1452755d577e10e7093d4b1943f
+SHA512: c12df55282f6a842318fcd3ae65eac39acd0cb1a4bbbd91e97aa4f087788ee493b65ee866359135249e964592ba7d0eeab5939278c6fb12b31f69611bafc9b4a
 Homepage: https://www.buskill.in/
 Description: BusKill is a dead man's switch designed to protect your computer
  if it is physically seized. You connect one end of a USB cable to your laptop
