@@ -1,0 +1,506 @@
+#!/usr/bin/env bash
+###############################################################################
+# File:    buskill-selfdestruct-diag
+# Purpose: Diagnostic semi-dry-run for buskill-selfdestruct.
+#          LUKS header/key destruction is skipped entirely.
+#          By default doesn't write to /proc/sysrq-trigger and doesn't poweroff
+# Created: 2026-08-25
+# Updated: 2026-08-27
+###############################################################################
+
+# Intentionally without set -e
+set -uo pipefail
+
+###########################################
+# CONFIG, LOGGING, ARGUMENT PARSING, ETC. #
+###########################################
+
+LOGFILE="$HOME/buskill-selfdestruct-diag-$(date +%Y%m%d_%H%M%S).log"
+CHROOT_PATH='/dev/shm/buskill-selfdestruct-diag/chroot'
+DIE_SCRIPT='/usr/bin/die.sh'
+NOHUP_TESTFILE="/tmp/buskill-nohup-test-$$"
+USB_VM=""
+CLEANUP_CHROOT=1
+POWER_OFF_COMMANDS=0
+
+log() {
+  local TIMESTAMP
+  TIMESTAMP="$(date '+%Y.%m.%d %H:%M:%S')"
+  local LINE="${TIMESTAMP}: $*"
+  echo "${LINE}" >> "${LOGFILE}"
+  echo "${LINE}"
+}
+
+# Run a command, capture output and exit code, log both, return the exit code.
+run_check() {
+  local MESSAGE="$1"; shift
+  log "CHECK: ${MESSAGE}"
+  log "CMD: $*"
+  local OUTPUT EXIT_CODE
+  OUTPUT="$("$@" 2>&1)" && EXIT_CODE=$? || EXIT_CODE=$?
+  while IFS= read -r LINE; do log "${LINE}"; done <<< "${OUTPUT}"
+  log "${MESSAGE}: exit ${EXIT_CODE}"
+  return ${EXIT_CODE}
+}
+
+cleanup() {
+  if [[ ${CLEANUP_CHROOT} -eq 1 && -d "${CHROOT_PATH}" ]]; then
+    log "Cleanup: unmounting chroot..."
+    umount "${CHROOT_PATH}/dev/pts"
+    umount "${CHROOT_PATH}/dev"
+    umount "${CHROOT_PATH}/sys"
+    umount "${CHROOT_PATH}/proc"
+    rm -rf "${CHROOT_PATH}" \
+      && log "Removed ${CHROOT_PATH}" \
+      || log "ERROR: Failed to remove ${CHROOT_PATH}"
+  fi
+  rm -f "${NOHUP_TESTFILE}" nohup.out
+}
+trap cleanup EXIT
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --usb-vm)                USB_VM="$2"; shift 2 ;;
+    --no-cleanup)            CLEANUP_CHROOT=0; shift ;;
+    --power-off-commands)    POWER_OFF_COMMANDS=1; shift ;;
+    -h|--help)
+        echo "Usage: $0 [--usb-vm VM_NAME] [--no-cleanup] [--power-off-commands]"
+        echo ""
+        echo "    --usb-vm VM_NAME        Name of the USB qube to test qvm-run connectivity"
+        echo "    --no-cleanup            Leave chroot in place after the run"
+        echo "    --power-off-commands    WARNING: actually attempt each poweroff method"
+        echo "                            (sysrq, poweroff --force, shutdown -h now)."
+        echo "                            Log is flushed to disk before each attempt."
+        echo "                            The machine will power off if any method succeeds."
+        exit 0 ;;
+    *) log "Unknown argument: $1"; shift ;;
+  esac
+done
+
+########
+# INIT #
+########
+
+touch "${LOGFILE}"
+log "Log file: ${LOGFILE}"
+log "Started:  $(date)"
+
+##################
+# 1. ENVIRONMENT #
+##################
+
+log "1. ENVIRONMENT"
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  log "OK: Running as root"
+else
+  log "ERROR: Not running as root"
+  exit 1
+fi
+
+if command -v qubes-prefs &>/dev/null; then
+  log "OK: qubes-prefs found - this is a Qubes OS dom0"
+else
+  log "ERROR: qubes-prefs not found - this script must run in Qubes OS dom0"
+fi
+
+
+########################
+# 2. UTILITY DISCOVERY #
+########################
+
+log "2. UTILITY DISCOVERY"
+
+WHICH="/usr/bin/which"
+declare -A UTIL_PATH
+MISSING_UTILS=()
+
+for util in cryptsetup ls cp mv ln mkdir mount cat grep echo chmod bash nohup sleep qvm-kill qvm-run poweroff chroot sync ldd xargs shutdown; do
+  var="${util//-/_}"
+  varname="${var^^}"
+  path=""
+  path="$("${WHICH}" "${util}")" && result=$? || result=$?
+  UTIL_PATH["${util}"]="${path}"
+  if [[ ${result} -eq 0 && -n "${path}" ]]; then
+    log "which ${util}: ${path}"
+    export "${varname}=${path}"
+  else
+    log "ERROR: which ${util}: NOT FOUND"
+    MISSING_UTILS+=("${util}")
+    export "${varname}="
+  fi
+done
+
+if [[ ${#MISSING_UTILS[@]} -gt 0 ]]; then
+  log "ERROR: Missing utilities: ${MISSING_UTILS[*]}"
+fi
+
+# If the binaries were found (except echo), use them. Otherwise this script
+# will in some cases (not all) fall back on calling them directly, but the
+# difference will be logged in these cases. In other cases it makes no sense,
+# e.g. when doing the real powering off.
+BASH="${UTIL_PATH[bash]:-}"
+CRYPTSETUP="${UTIL_PATH[cryptsetup]:-}"
+CAT_BIN="${UTIL_PATH[cat]:-}"
+CHMOD_BIN="${UTIL_PATH[chmod]:-}"
+CP_BIN="${UTIL_PATH[cp]:-}"
+LDD_BIN="${UTIL_PATH[ldd]:-}"
+LN_BIN="${UTIL_PATH[ln]:-}"
+LS_BIN="${UTIL_PATH[ls]:-}"
+MKDIR_BIN="${UTIL_PATH[mkdir]:-}"
+MOUNT_BIN="${UTIL_PATH[mount]:-}"
+MV_BIN="${UTIL_PATH[mv]:-}"
+NOHUP_BIN="${UTIL_PATH[nohup]:-}"
+POWEROFF_BIN="${UTIL_PATH[poweroff]:-}"
+SLEEP_BIN="${UTIL_PATH[sleep]:-}"
+SYNC_BIN="${UTIL_PATH[sync]:-}"
+XARGS_BIN="${UTIL_PATH[xargs]:-}"
+
+##########################
+# 3. USB VM CONNECTIVITY #
+##########################
+
+log "3. USB VM CONNECTIVITY"
+
+if [[ -z "${USB_VM}" ]]; then
+  # Try buskill-get-usb-qube first
+  if command -v buskill-get-usb-qube ; then
+    USB_VM="$(buskill-get-usb-qube)" || USB_VM=""
+    [[ -n "${USB_VM}" ]] && log "Auto-detected USB VM via buskill-get-usb-qube: ${USB_VM}"
+  fi
+fi
+
+if [[ -z "${USB_VM}" ]]; then
+  # Fall back to first @tag:buskill VM
+  if command -v qvm-ls ; then
+    USB_VM="$(qvm-ls --tags buskill --raw-list | head -1)" || USB_VM=""
+    [[ -n "${USB_VM}" ]] && log "Auto-detected USB VM via qvm-ls --tags buskill: ${USB_VM}"
+  fi
+fi
+
+if [[ -z "${USB_VM}" ]]; then
+  log "USB VM not found, skipping qvm-run checks (manually add --usb-vm VM_NAME)"
+else
+  log "Testing USB VM: ${USB_VM}"
+
+  run_check "VM '${USB_VM}' is running" \
+    bash -c "qvm-ls --running --raw-list | grep -Fx '${USB_VM}'"
+
+  run_check "buskill-lock-interface-qubes.sh present in ${USB_VM}" \
+    "${UTIL_PATH[qvm-run]:-qvm-run}" --no-gui --pass-io "${USB_VM}" \
+      '[ -f /usr/bin/buskill-lock-interface-qubes.sh ] && echo OK'
+fi
+
+############################
+# 4. SYSRQ POWER-OFF CHECK #
+############################
+
+log "4. SYSRQ POWER-OFF"
+
+SYSRQ_CONF="/proc/sys/kernel/sysrq"
+SYSRQ_TRIGGER="/proc/sysrq-trigger"
+
+if [[ -r "${SYSRQ_CONF}" ]]; then
+  SYSRQ_VALUE="$(cat "${SYSRQ_CONF}")"
+  log "${SYSRQ_CONF} = ${SYSRQ_VALUE}"
+
+  # https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html
+  # 0x80 (128) enables the 'o' ("Will shut your system off") key
+  if [[ "${SYSRQ_VALUE}" -eq 1 ]]; then
+    log "sysrq all-enabled (value=1) - 'echo o > /proc/sysrq-trigger' will work"
+  elif (( SYSRQ_VALUE & 128 )); then
+    log "sysrq power-off bit (0x80) is set - 'echo o > /proc/sysrq-trigger' will work"
+  else
+    log "ERROR: sysrq power-off bit (0x80/128) not set in value ${SYSRQ_VALUE}"
+    log "       'echo o > /proc/sysrq-trigger' will be silently ignored."
+    log "       Run: echo 128 > /proc/sys/kernel/sysrq to resolve once"
+    log "       or add to sysctl.conf for persistence."
+  fi
+else
+  log "ERROR: ${SYSRQ_CONF} not readable"
+fi
+
+if [[ -e "${SYSRQ_TRIGGER}" ]]; then
+  log "${SYSRQ_TRIGGER} exists"
+  if [[ -w "${SYSRQ_TRIGGER}" ]]; then
+    log "${SYSRQ_TRIGGER} is writable"
+  else
+    log "ERROR: ${SYSRQ_TRIGGER} is not writable. 'echo o > /proc/sysrq-trigger' will fail with permission denied"
+  fi
+else
+  log "ERROR: ${SYSRQ_TRIGGER} does not exist"
+fi
+
+log "Not writing to ${SYSRQ_TRIGGER}"
+
+#########################################
+# 5. NOHUP + SLEEP + COMMAND CHAIN TEST #
+#########################################
+
+log "5. NOHUP CHAIN TEST"
+
+# Equivalent of:
+# nohup sleep 60 && echo o > /proc/sysrq-trigger &
+
+rm -f "${NOHUP_TESTFILE}"
+
+if [[ -n "${NOHUP_BIN}" && -n "${SLEEP_BIN}" && -n "${BASH}" ]]; then
+  log "Launching: \$NOHUP_BIN \$BASH -c '\$SLEEP_BIN 3 && echo NOHUP_COMMAND_CHAIN >> \$NOHUP_TESTFILE' &"
+  "${NOHUP_BIN}" "${BASH}" -c "\"${SLEEP_BIN}\" 3 && echo NOHUP_COMMAND_CHAIN >> '${NOHUP_TESTFILE}'" &
+  NOHUP_PID=$!
+  log "Background PID: ${NOHUP_PID}"
+
+  log "Waiting 6 seconds for the chain to run..."
+  sleep 6
+
+  if grep -q "NOHUP_COMMAND_CHAIN" "${NOHUP_TESTFILE}" 2>/dev/null; then
+    log "nohup + sleep + command chain executed successfully"
+  else
+    log "ERROR: nohup + sleep + command chain did not produce expected output"
+    log "       This is the mechanism used for all three delayed shutdown methods"
+    log "       Process status" ps -p "${NOHUP_PID}" || true
+  fi
+else
+  log "ERROR: nohup/sleep/bash not found - skipping chain test"
+fi
+
+#############################################
+# 6. CHROOT CONSTRUCTION (without entering) #
+#############################################
+
+log "6. CHROOT CONSTRUCTION"
+
+CHROOT_FAILED=0
+
+# Directory structure
+log "Creating chroot directories in ${CHROOT_PATH}"
+for dir in proc sys dev pts bin lib64 lib/systemd usr/sbin usr/bin; do
+  if [[ -n "${MKDIR_BIN}" ]]; then
+    "${MKDIR_BIN}" -p "${CHROOT_PATH}/${dir}" 2>>"${LOGFILE}" \
+      && log "\$MKDIR_BIN -p ${CHROOT_PATH}/${dir}" \
+      || { log "\$MKDIR_BIN -p ${CHROOT_PATH}/${dir}"; CHROOT_FAILED=1; }
+  else
+    mkdir -p "${CHROOT_PATH}/${dir}" 2>>"${LOGFILE}" \
+      && log "mkdir -p ${CHROOT_PATH}/${dir}" \
+      || { log "mkdir -p ${CHROOT_PATH}/${dir}"; CHROOT_FAILED=1; }
+  fi
+done
+
+# Mounts
+MOUNT_FAILED=0
+# The same mountpoints as in buskill-selfdestruct
+# For convenience present each loop item as "opts@target", then split
+for option in "-t proc none@proc" "-t sysfs none@sys" "-o bind /dev@dev" "-o bind /dev/pts@dev/pts:"; do
+  opts="${option%%@*}"
+  name="${option#*@}"
+  target="${CHROOT_PATH}/${name}"
+  if [[ -n "${MOUNT_BIN}" ]]; then
+    "${MOUNT_BIN}" ${opts} "${target}" 2>>"${LOGFILE}" \
+      && log "\$MOUNT_BIN ${name} -> ${target}" \
+      || { log "ERROR: \$MOUNT_BIN ${name} -> ${target}, setting MOUNT_FAILED=1; CHROOT_FAILED=1"; MOUNT_FAILED=1; CHROOT_FAILED=1; }
+  else
+    mount ${opts} "${target}" 2>>"${LOGFILE}" \
+      && log "mount ${name} -> ${target}" \
+      || { log "ERROR: mount ${name} -> ${target}, setting MOUNT_FAILED=1; CHROOT_FAILED=1"; MOUNT_FAILED=1; CHROOT_FAILED=1; }
+  fi
+done
+
+# Copy binaries and the libraries they depend on
+log "Copying binaries and shared libraries into chroot"
+STATIC_BINARIES=()
+
+binaries="${BASH} ${CRYPTSETUP} ${LS_BIN} ${NOHUP_BIN} ${SLEEP_BIN} ${XARGS_BIN} ${SYNC_BIN} ${POWEROFF_BIN}"
+for binary in ${binaries}; do
+  [[ -z "${binary}" ]] && continue
+
+  DEST_BIN="${CHROOT_PATH}${binary}"
+  DEST_DIR="$(dirname "${DEST_BIN}")"
+  mkdir -p "${DEST_DIR}" 2>>"${LOGFILE}" || true
+
+  if [[ -n "${CP_BIN}" ]]; then
+    "${CP_BIN}" -vf "${binary}" "${DEST_BIN}" >> "${LOGFILE}" 2>&1 \
+      && log "\$CP_BIN ${binary}" \
+      || { log "ERROR: \$CP_BIN ${binary} failed, setting CHROOT_FAILED=1"; CHROOT_FAILED=1; continue; }
+  else
+    log "ERROR: cp binary not available for ${binary}, setting CHROOT_FAILED=1"
+    CHROOT_FAILED=1
+    continue
+  fi
+
+  # Get the libraries
+  LDD_OUT="$("${LDD_BIN:-ldd}" "${binary}" 2>&1)"
+  libraries="$(echo "${LDD_OUT}" | grep -Eo '/lib[^ ]*\.so(\.[0-9]*)?' || true)"
+
+  if [[ -z "${libraries}" ]]; then
+    if echo "${LDD_OUT}" | grep -qi "statically linked\|not a dynamic executable"; then
+      log "${binary}: statically linked - no libraries to copy"
+      log "In buskill-selfdestruct, this would trigger ldd|grep pipefail exit!!!"
+      STATIC_BINARIES+=("${binary}")
+    else
+      log             "ERROR: ${binary}: no /lib paths in ldd output"
+      log  "       ldd output: ${LDD_OUT}"
+    fi
+    continue
+  fi
+
+  for library in ${libraries}; do
+    DEST_LIB="${CHROOT_PATH}${library}"
+    mkdir -p "$(dirname "${DEST_LIB}")" 2>>"${LOGFILE}" || true
+    "${CP_BIN}" -vf "${library}" "${DEST_LIB}" >> "${LOGFILE}" 2>&1 \
+      && log "\$CP_BIN ${library} ${DEST_LIB}" \
+      || { log "ERROR: \$CP_BIN ${library} ${DEST_LIB}, setting CHROOT_FAILED=1"; CHROOT_FAILED=1; }
+  done
+done
+
+if [[ ${#STATIC_BINARIES[@]} -gt 0 ]]; then
+  log "Statically-linked binaries: ${STATIC_BINARIES[*]}"
+fi
+
+# lib -> usr/lib symlink
+if [[ -d "${CHROOT_PATH}/lib" ]]; then
+  if [[ -n "${MV_BIN}" ]]; then
+    "${MV_BIN}" "${CHROOT_PATH}/lib" "${CHROOT_PATH}/usr/lib" 2>>"${LOGFILE}" \
+      && log "\$MV_BIN ${CHROOT_PATH}/lib -> ${CHROOT_PATH}/usr/lib" \
+      || { log "ERROR: \$MV_BIN ${CHROOT_PATH}/lib -> ${CHROOT_PATH}/usr/lib, setting CHROOT_FAILED=1"; CHROOT_FAILED=1; }
+  fi
+  if [[ -n "${LN_BIN}" ]]; then
+    "${LN_BIN}" -s "usr/lib" "${CHROOT_PATH}/lib" 2>>"${LOGFILE}" \
+      && log "\$LN_BIN -s usr/lib ${CHROOT_PATH}/lib" \
+      || { log "ERROR: \$LN_BIN -s usr/lib ${CHROOT_PATH}/lib, setting CHROOT_FAILED=1"; CHROOT_FAILED=1; }
+  fi
+else
+  log "${CHROOT_PATH}/lib did not exist after binary copy"
+  log "  Might be because all /lib deps landed under /usr/lib, or all binaries are static"
+  log "  In the real buskill-selfdestruct, the unconditional 'mv lib usr/lib' would fail with set -e"
+fi
+
+# Write die.sh
+log "Writing die.sh to ${CHROOT_PATH}/${DIE_SCRIPT}"
+
+if [[ -n "${CAT_BIN}" && -n "${BASH}" ]]; then
+  "${CAT_BIN}" << EOF > "${CHROOT_PATH}/${DIE_SCRIPT}" 2>>"${LOGFILE}"
+#!${BASH}
+# generated by buskill-selfdestruct-diag (diagnostic only, won't be executed)
+
+# Extended shutdown timers from inside chroot
+${NOHUP_BIN} ${SLEEP_BIN} 10 && echo o > /proc/sysrq-trigger &
+${NOHUP_BIN} ${SLEEP_BIN} 11 && ${POWEROFF_BIN} --poweroff --no-sync --no-wall --force &
+
+echo "INFO: removing decryption keys from memory"
+waits=''
+for device in \$( ${LS_BIN} -1 "/dev/mapper" ); do
+  echo -e "\t\${device}"
+  ${CRYPTSETUP} luksSuspend "\${device}" &
+  waits="\${waits} \$!"
+done
+waits=\`echo "\${waits}" | ${XARGS_BIN}\`
+if [[ \${waits} ]]; then wait \${waits}; fi
+
+sync; echo 3 > /proc/sys/vm/drop_caches
+echo o > /proc/sysrq-trigger &
+${SLEEP_BIN} 1
+${POWEROFF_BIN} --poweroff --no-sync --no-wall --force &
+EOF
+  DIE_SH_WRITE_EXIT_CODE=$?
+
+  if [[ ${DIE_SH_WRITE_EXIT_CODE} -eq 0 ]]; then
+    log "die.sh written"
+    if [[ -n "${CHMOD_BIN}" ]]; then
+      "${CHMOD_BIN}" +x "${CHROOT_PATH}/${DIE_SCRIPT}" 2>>"${LOGFILE}" \
+        && log "die.sh \$CHMOD_BIN +x" \
+        || { log "ERROR: die.sh \$CHMOD_BIN +x, setting CHROOT_FAILED=1"; CHROOT_FAILED=1; }
+    fi
+  else
+    log "die.sh write failed (exit ${DIE_SH_WRITE_EXIT_CODE}), setting CHROOT_FAILED=1"
+    CHROOT_FAILED=1
+  fi
+else
+  log "cat or bash not available - cannot write die.sh, setting CHROOT_FAILED=1"
+  CHROOT_FAILED=1
+fi
+
+# Check the chroot paths (suppress errors intentionally)
+log "Chroot contents (excluding proc/sys/dev):"
+find "${CHROOT_PATH}" \
+  ! -path "${CHROOT_PATH}/proc/*" \
+  ! -path "${CHROOT_PATH}/sys/*" \
+  ! -path "${CHROOT_PATH}/dev/*" \
+  2>/dev/null | sort | while IFS= read -r FILE; do log " ${FILE}"; done
+
+log "(Chroot not entered intentionally; die.sh won't be executed)"
+
+if [[ ${CHROOT_FAILED} -eq 0 ]]; then
+  log "Chroot construction completed without errors"
+else
+  log "Chroot construction had errors - see above"
+fi
+
+##############################################################
+# 7. LIVE POWEROFF COMMANDS (only with --power-off-commands) #
+##############################################################
+
+if [[ ${POWER_OFF_COMMANDS} -eq 1 ]]; then
+  log "7. LIVE POWEROFF COMMANDS"
+
+  # Run the powering off methods and log their results.
+  # The machine is likely to power off before the log calls after the command
+  # runs. This is natural and means that such a method works as intended.
+  try_poweroff() {
+    local POWEROFF_STRATEGY_NAME="$1"; shift
+    log "Attempting: ${POWEROFF_STRATEGY_NAME}"
+    log "CMD: $*"
+    sync
+    local OUTPUT EXIT_CODE
+    # Run in a subshell to capture stderr
+    OUTPUT="$("$@" 2>&1)" && EXIT_CODE=$? || EXIT_CODE=$?
+    # If this point is reached, the machine is still up
+    log "${POWEROFF_STRATEGY_NAME}: returned (machine still running)"
+    log "${POWEROFF_STRATEGY_NAME}: exit code: ${EXIT_CODE}"
+    if [[ -n "${OUTPUT}" ]]; then
+      while IFS= read -r LINE; do
+        log "${POWEROFF_STRATEGY_NAME}: output: ${LINE}"
+      done <<< "${OUTPUT}"
+    else
+      log "${POWEROFF_STRATEGY_NAME}: no output on stdout/stderr"
+    fi
+    if [[ ${EXIT_CODE} -eq 0 ]]; then
+      log "${POWEROFF_STRATEGY_NAME}: exited 0 but machine is still running"
+      log "command was accepted but did **not** result in poweroff"
+    else
+      log "${POWEROFF_STRATEGY_NAME}: exited ${EXIT_CODE}, command was rejected"
+    fi
+  }
+
+  # Method 1: sysrq 'o'
+  try_poweroff "sysrq echo o" \
+    bash -c 'echo o > /proc/sysrq-trigger'
+
+  # Method 2: poweroff --poweroff --no-sync --no-wall --force
+  if [[ -n "${POWEROFF_BIN}" ]]; then
+    try_poweroff "poweroff --poweroff --no-sync --no-wall --force" \
+      "${POWEROFF_BIN}" --poweroff --no-sync --no-wall --force
+  else
+    log "ERROR: poweroff binary not found - skipping"
+  fi
+
+  # Method 3: shutdown -h now
+  SHUTDOWN_BIN_PATH="$(command -v shutdown)" || SHUTDOWN_BIN_PATH=""
+  if [[ -n "${SHUTDOWN_BIN_PATH}" ]]; then
+    try_poweroff "shutdown -h now" \
+      "${SHUTDOWN_BIN_PATH}" -h now
+    log "Waiting 5 seconds to observe shutdown -h now effect..."
+    sleep 5
+    log "Machine still running 5 s after 'shutdown -h now'"
+    if "${SHUTDOWN_BIN_PATH}" -c; then
+      log "Pending shutdown intentionally cancelled (shutdown -c)"
+    fi
+  else
+    log "ERROR: shutdown not found - skipping"
+  fi
+fi
+
+###########
+# SUMMARY #
+###########
+
+log "DONE, logged to ${LOGFILE}"

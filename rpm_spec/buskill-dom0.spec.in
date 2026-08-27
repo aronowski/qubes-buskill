@@ -115,6 +115,7 @@ fi
 /usr/bin/buskill-get-usb-qube
 /usr/bin/buskill-selfdestruct
 /usr/share/applications/buskill-disarm.desktop
+/usr/bin/buskill-selfdestruct-diag
 
 %changelog
 @CHANGELOG@

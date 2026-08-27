@@ -17,6 +17,7 @@ install-dom0:
 	install -m 644 -D buskill/dom0/salt/buskill-dom0.sls $(DESTDIR)/srv/salt/buskill-dom0.sls
 	install -m 644 -D buskill/dom0/salt/buskill-dom0-uninstall.sls $(DESTDIR)/srv/salt/buskill-dom0-uninstall.sls
 	install -m 644 -D buskill/dom0/salt/buskill.top $(DESTDIR)/srv/salt/buskill.top
+	install -m 775 -D contrib/buskill-selfdestruct-diag $(DESTDIR)/usr/bin/buskill-selfdestruct-diag
 
 install-vm:
 	install -m 775 -D buskill/vm/buskill-disarm.sh $(DESTDIR)/usr/bin/buskill-disarm.sh
