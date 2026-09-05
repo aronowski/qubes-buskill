@@ -48,6 +48,8 @@ make install-vm DESTDIR=$RPM_BUILD_ROOT SYSLIBDIR=/usr/lib
 /etc/qubes-rpc/qubes.LockScreen
 /usr/bin/buskill-disarm.sh
 /usr/bin/buskill-lock-interface-qubes.sh
+/usr/bin/buskill-set-trigger-to
+/usr/bin/buskill-update-udev-rules
 /usr/lib/systemd/system-preset/80-buskill.preset
 /usr/lib/systemd/system/buskill.service
 /usr/share/applications/buskill-disarm.desktop

@@ -5,6 +5,11 @@ buskill-enable-on-{{ usb_vm }}:
   cmd.run:
     - name: qvm-service {{ usb_vm }} buskill on
 
+buskill-set-default-trigger-on-{{ usb_vm }}:
+  cmd.run:
+    - name: qvm-features {{ usb_vm }} vm-config.buskill-trigger lock-screen
+    - unless: qvm-features {{ usb_vm }} vm-config.buskill-trigger
+
 {% if guivm == 'dom0' %}
 buskill-setup-xfce-shortcut:
   cmd.run:

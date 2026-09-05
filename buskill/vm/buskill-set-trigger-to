@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+################################################################################
+# File:    (interface qube's TemplateVM): /usr/bin/buskill-set-trigger-to
+# Purpose: Set the BusKill trigger from an interface qube, sening and RPC to
+#          dom0. Installed in Fedora TemplateVMs used for interface qubes
+#          (sys-gui, sys-gui-vnc, sys-gui-gpu). For more info, see:
+#          https://buskill.in/qubes-os/
+# Created: 2026-09-05
+# License: GNU GPLv3
+################################################################################
+
+set -euo pipefail
+
+BUSKILL_TRIGGER="$1"
+
+case "${BUSKILL_TRIGGER}" in
+  lock-screen)  ;;
+  soft-shutdown)  ;;
+  hard-reboot)  ;;
+  self-destruct) ;;
+  *)
+    echo "Usage: $0 <BUSKILL_TRIGGER>"
+    echo "Available triggers: lock-screen, soft-shutdown, hard-reboot, self-destruct"
+    exit 1
+    ;;
+esac
+
+/usr/bin/qrexec-client-vm dom0 "buskill.setTriggerTo+${BUSKILL_TRIGGER}"

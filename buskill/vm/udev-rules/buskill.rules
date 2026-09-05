@@ -1,11 +1,11 @@
 ################################################################################
 # File:    @USB_VM@:/etc/buskill/buskill.rules -> /etc/udev/rules.d/buskill.rules
 # Purpose: Add buskill rules. For more info, see: https://buskill.in/qubes-os/
-# Authors: Michael Altfield <michael@buskill.in>
-# Created: 2020-01-02
-# License: GNU GPLv3
+#          This is a placeholder. The BusKill trigger rule is written in
+#          runtime with the buskill-update-udev-rules script. The trigger value
+#          is stored in qubesdb as the /vm-config/buskill-trigger key. Don't
+#          edit this file, because the changes will be overwritten, e.g. if
+#          your USB qube is a disposable. To change the trigger, use the
+#          buskill-set-trigger-to script (either in dom0 or in your other
+#          interface qube)
 ################################################################################
-ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/buskill-lock-interface-qubes.sh"
-#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+soft-shutdown"
-#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+hard-reboot"
-#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm dom0 buskill.selfDestruct"

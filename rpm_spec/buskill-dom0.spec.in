@@ -49,7 +49,8 @@ USB_QUBE=$(/usr/bin/buskill-get-usb-qube)
 for file in \
     /etc/qubes/policy.d/80-buskill.policy \
     /usr/share/applications/buskill-disarm.desktop \
-    /usr/bin/buskill-selfdestruct; do
+    /usr/bin/buskill-selfdestruct \
+    /usr/bin/buskill-set-trigger-to; do
     sed -i "s/@USB_VM@/${USB_QUBE}/g" "$file"
 done
 
@@ -105,6 +106,7 @@ fi
 %files
 /etc/i3/config.d/buskill.conf
 /etc/qubes-rpc/buskill.selfDestruct
+/etc/qubes-rpc/buskill.setTriggerTo
 /etc/qubes-rpc/qubes.HostState.Set
 /etc/qubes/policy.d/80-buskill.policy
 /srv/salt/buskill-dom0-uninstall.sls
@@ -114,6 +116,7 @@ fi
 /srv/salt/buskill.top
 /usr/bin/buskill-get-usb-qube
 /usr/bin/buskill-selfdestruct
+/usr/bin/buskill-set-trigger-to
 /usr/share/applications/buskill-disarm.desktop
 /usr/bin/buskill-selfdestruct-diag
 

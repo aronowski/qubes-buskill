@@ -3,6 +3,9 @@ qubes.LockScreen * @USB_VM@ sys-gui allow autostart=no
 qubes.LockScreen * @USB_VM@ sys-gui-vnc allow autostart=no
 qubes.LockScreen * @USB_VM@ sys-gui-gpu allow autostart=no
 buskill.selfDestruct * @USB_VM@ dom0 allow
+buskill.setTriggerTo * sys-gui dom0 allow
+buskill.setTriggerTo * sys-gui-vnc dom0 allow
+buskill.setTriggerTo * sys-gui-gpu dom0 allow
 buskill.Disarm * sys-gui @USB_VM@ allow autostart=no
 buskill.Disarm * sys-gui-vnc @USB_VM@ allow autostart=no
 buskill.Disarm * sys-gui-gpu @USB_VM@ allow autostart=no

@@ -67,38 +67,34 @@ and i3wm during package installation.
 ## Configuring the trigger
 
 By default, BusKill locks the screen when the cable is disconnected. You can
-change this by editing the udev rules file inside the USB qube.
+change this by running the `buskill-set-trigger-to` script in your interface
+qube (including dom0).
 
-Open a terminal in the USB qube and edit the active rules file:
+To switch triggers, run it with one of the triggers as an argument:
 
-```shell
-sudo vim /etc/buskill/buskill.rules
-```
+| Trigger         | Effect                               |
+|-----------------|--------------------------------------|
+| `lock-screen`   | Lock screen (default)                |
+| `soft-shutdown` | Graceful shutdown                    |
+| `hard-reboot`   | Immediate hard reboot                |
+| `self-destruct` | **Wipe LUKS keys - more info below** |
 
-The file contains one active line and three commented alternatives:
-
-```udev
-ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/buskill-lock-interface-qubes.sh"
-#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+soft-shutdown"
-#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+hard-reboot"
-#ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm dom0 buskill.selfDestruct"
-```
-
-To switch triggers, comment out the active line and uncomment exactly one of
-the alternatives:
-
-| Trigger                             | Effect                               |
-|-------------------------------------|--------------------------------------|
-| `buskill-lock-interface-qubes.sh`   | Lock screen (default)                |
-| `qubes.HostState.Set+soft-shutdown` | Graceful shutdown                    |
-| `qubes.HostState.Set+hard-reboot`   | Immediate hard reboot                |
-| `buskill.selfDestruct`              | **Wipe LUKS keys - more info below** |
-
-After editing, reload udev inside the USB qube:
+Example:
 
 ```shell
-udevadm control --reload
+buskill-set-trigger-to soft-shutdown
 ```
+
+The change is applied immediately\* and persists across your USB qube reboots,
+even if it's a named disposable, [like sys-usb is by
+default](https://doc.qubes-os.org/en/r4.3/user/downloading-installing-upgrading/installation-guide.html#main-configuration).
+There's no need to reconfigure anything manually. The selected trigger persists
+after BusKill is uninstalled - this is intentional, so a reinstallation to
+reconfigure BusKill to use a different interface qube, doesn't unintentionally
+reset the trigger.
+
+\* Exception: if your USB qube is shut down when running the command, it will
+start automatically, which will take a few seconds.
 
 **Warning**: The `buskill.rules` file is the *active* trigger configuration.
 The `buskill.lock.rules` file is swapped in temporarily during the 30-second

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+################################################################################
+# File:    @USB_VM@:/usr/bin/buskill-update-udev-rules
+# Purpose: Replace the placeholder /etc/buskill/buskill.rules with the chosen
+#          udev rule. The desired trigger is stored in qubesdb as the
+#          /vm-config/buskill-trigger key. This script runs at startup with
+#          buskill.service and is invoked by buskill-set-trigger-to when the
+#          trigger is being changed. For more info, see:
+#          https://buskill.in/qubes-os/
+# Created: 2026-09-05
+# License: GNU GPLv3
+################################################################################
+
+set -euo pipefail
+
+BUSKILL_RULES_PLACEHOLDER='/etc/buskill/buskill.rules'
+
+BUSKILL_TRIGGER="$(qubesdb-read /vm-config/buskill-trigger)"
+if [[ -z "${BUSKILL_TRIGGER}" ]]; then
+  echo "$0: The /vm-config/buskill-trigger key contains no value. Using lock-screen as a fallback"
+  BUSKILL_TRIGGER='lock-screen'
+fi
+
+case "${BUSKILL_TRIGGER}" in
+  lock-screen)
+    BUSKILL_UDEV_RULE='ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/buskill-lock-interface-qubes.sh"'
+    ;;
+  soft-shutdown)
+    BUSKILL_UDEV_RULE='ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+soft-shutdown"'
+    ;;
+  hard-reboot)
+    BUSKILL_UDEV_RULE='ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm @default qubes.HostState.Set+hard-reboot"'
+    ;;
+  self-destruct)
+    BUSKILL_UDEV_RULE='ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/qrexec-client-vm dom0 buskill.selfDestruct"'
+    ;;
+  *)
+    echo "$0: unknown trigger '${BUSKILL_TRIGGER}' provided as argument. Using lock-screen as a fallback"
+    BUSKILL_UDEV_RULE='ACTION=="remove", SUBSYSTEM=="usb", RUN+="/usr/bin/buskill-lock-interface-qubes.sh"'
+    ;;
+esac
+
+# Reuse the banner, so the user is always informed to not edit the file
+# manually, then add the chosen rule (reloading them is done from the
+# buskill-set-trigger-to script as root, e.g. in case of non-passwordless
+# qubes)
+BUSKILL_PLACEHOLDER_HEADER="$(grep '^#' "${BUSKILL_RULES_PLACEHOLDER}")"
+printf '%s\n\n%s\n' "${BUSKILL_PLACEHOLDER_HEADER}" "${BUSKILL_UDEV_RULE}" > "${BUSKILL_RULES_PLACEHOLDER}"
