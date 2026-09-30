@@ -4,40 +4,40 @@ Hash: SHA512
 Architectures: amd64 all
 Codename: trixie
 Components: main
-Date: Mon, 07 Sep 2026 17:56:21 +0000
+Date: Wed, 30 Sep 2026 16:57:08 +0000
 Description: Qubes BusKill package repository
 Label: qubes-buskill
 Origin: qubes-buskill
 Suite: trixie
 MD5Sum:
- 8b6a06c8fed12c9e0a7a370eb2b6f6ac              200 Release
- 5ee9ce2e1852d8dca5449d65ed6d65a2             1269 main/binary-amd64/Packages
- 5851fd5ed3e285d625342f23e7c293f0              813 main/binary-amd64/Packages.gz
+ 9d1180b6a335b62f5a319d1b5b1bad73              200 Release
+ bdf47c0eee3e33f8f3161d823189c0c3             1295 main/binary-amd64/Packages
+ af5d3be08f8f7c81caf668b7560b5f6e              829 main/binary-amd64/Packages.gz
 SHA1:
- c012e736b0e837e509afb214799a538cbb4b0d33              200 Release
- 9e0e40ca1d7d04b0cae0e4061e7907b4e364d05e             1269 main/binary-amd64/Packages
- c76edf26d827ef6f6301970072621b5ef7a1a645              813 main/binary-amd64/Packages.gz
+ dfd991ee83f9c84c0af3751f91176ab81e83ec84              200 Release
+ a973a5837e7eec18a10d8df7d79869c4b08124a1             1295 main/binary-amd64/Packages
+ aee3b2224e91182b590246a858899f2ba91e4355              829 main/binary-amd64/Packages.gz
 SHA256:
- cbfbd9687b963b2550b16f5d3ae6c14d97a2410f2183e2ce7a42962c43eab773              200 Release
- 2d1aefb9b6dcae3cd66762add803cb48476b66c45708abdb9019040fdb3ef4a0             1269 main/binary-amd64/Packages
- e751dd1542b30e6238d96e21857c9147015c89ce3e8497bc63963c5fa536f7fa              813 main/binary-amd64/Packages.gz
+ 700401a0fb48f78069ba545a0f40eb4a508add6023eb0b9721694762f4fdb854              200 Release
+ d5c1cc1f63e1c7d4e5349db934b9fc1262975f7db0015d43b9c519d021e6bd54             1295 main/binary-amd64/Packages
+ 97db7edfe3231161873d183e307d449672279a0061010947d5afe93873dd2f7a              829 main/binary-amd64/Packages.gz
 SHA512:
- 39f505a55567ee5c6f8b53aab1d85ce2525ecc5ed568599546c56a866db1a2d20520bd1b545ea4f69faa3cc7b0232ef299ae30f2e25594103c8000b8df72a2ce              200 Release
- a1480ad5d4a6678eb96107682820f9a84b0771de3dcd67daeae11f0e869da1e363beb73ba695a84f0c7050c58e98cf077c754b41657678bb4702255d032cac33             1269 main/binary-amd64/Packages
- ab08163d1bc57944e0f81a1dddb37cac0cfbfe1f842933112a69427791947426f25d7d1aae7a95c4ab1b6634950b5554a83a9f1a67893a6be62c126a89eeed99              813 main/binary-amd64/Packages.gz
+ ee13374aa9194e4119cc47355905f99b4a047b897ad4abd5e01a5afcc588cc19763ff74fe7713fee09eecf5ee234c32a10e2bb2b31e03c04af8497d8770be9c1              200 Release
+ 0229ada3f48c8785eabb9df1b062feb3d4c765c46c6ae653a5a5f7cbd2257454521b9f7d576f80c1c3c908207d078146596410e72a848cc0c34b2b51effe7df6             1295 main/binary-amd64/Packages
+ b1cbd2bea8abf0b3a131fb3d0c5e9dd21903c5f257626e7c7ca664463028f0783a8fa717cb890bd42793c9e1073f0d60feb852c52fe9d4aa26ba50756d1f53be              829 main/binary-amd64/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iQIzBAEBCgAdFiEEshyZiqcXKGiF6lsYg6bw6P0zzcsFAmqe+sUACgkQg6bw6P0z
-zcuvKQ//RQLB6rqA6uvaizVLS9SA+VJ7j4PknJpOzxlhOgHPG9xrJIvNFBeujXCV
-LyBjNe0/pfV4EfbusZmFSniDeAwGnio7uNCd59kLytoUhgSaNtRjDBk4foRmcRFg
-KhbRMoHABxY4jVvnyNABMcJC7sU1tzKnB8gwoPBRAFxkYgui10JRnhdZwQlN/CWE
-920mBRUVpMSNNXb4v1HRblsBbPpdye+q3DEpM+RaVyiOZ5nLlafQwgQq/J9nsrFj
-l4kh0aZkDNKfNLd37UsMcaU438xNnzSwSJbFlNwCzHtNS2kIMtgUwySk0hmutMKP
-A4W9GpmoaCBI9yzpm4p0E4mDE6cCMWUi675rzyBQ8epV3K4q2lAPhA1uV/56UTka
-CuK97PdQv9uGS/IezgDcA90x1YdzpFZlmHuYpqRia4QgnLXMAW7vYWOmQq5XA2CS
-lUDQEq52na0E+FTuMyiPn21zYmf2gxmJTz7LkG2kt0ip83CkKQuxYkwD4MdPOYvy
-PnpMwi2GFyILC5qVAagpiGYSkZ3lRXDJXmjgVo7fFbJzRJDf44GcA8QaKdBfyEqm
-beoP6OA+7yLf5yLRivpkaE59lh9wjhuVy5RjXE2c7iVvyVT8gSmlr/zDiaASaSVh
-xjd68awtbP5VwkAoI0M1BW+wGadZAjdTs+Df+Iu5mEQlo5wXPCI=
-=U08i
+iQIzBAEBCgAdFiEEshyZiqcXKGiF6lsYg6bw6P0zzcsFAmq9P2QACgkQg6bw6P0z
+zctC6g//QH4msdStLFHnAntE2sR8MKI6uI4Q9/Butkdd3Xg4lpiCPgNer3jneusS
+zD3tmyxwxXjV/Oe4BKjoEuekvyktvERvAKL41GZ8Z/mXElbpWFVOY1gbFeY/sPjl
++LOM9zit27GwOWGA0XrIs48vOkuak2q8HweC3l3I/B1V0hiB6AHZ34e2xxCpuc00
+LmEhhRsciwEry7Yv0u2ggiUMqx8+J4lKwUoJ5mNABpMDrBBuiNivCEeA0DKQFtVw
+I6hLsLKCLwwM5E38eygizFKsS3Zq9ZgYPn6vMw3qMVnOAQveHNHkdFmSZttM2pFs
+BLnFLeCP4bV0UXUvXpnwfT/4KJFkFvkCbaPZzmvgG3AtSiiV0qsLAa7QgmuYy9an
+eDzyOEOKhEV7ofkr0He9GnqYUQ4lOIbqv02zf+yMFZc1uPw4xX/g4T27EfTGku8M
+OZhiX8FR39VQkwMA9z0F7Z/rOVnyC3G9iVeDnp5df5lP8eCpLBYLwJWSvp9f7qGz
+V3KPiNQNhdlNGixUgCnShOVCbCK6gbnuQgebNRCw+DSa5fNn6TAHDZd//IbJyAEk
+glP3Xzb7oKHkcWHHKdQ3399Zf6L4rELW4RCAynEkhMoD4j4/XjO8UilLO86IIbKt
+jed6h/IS1To91i3kK2T9sfMdb+d12ILUfMZBCrzcZLYAuMjqJiQ=
+=OR9U
 -----END PGP SIGNATURE-----
