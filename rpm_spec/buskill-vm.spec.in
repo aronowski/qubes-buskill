@@ -12,6 +12,8 @@ BuildArch: noarch
 BuildRequires: make
 BuildRequires: systemd-rpm-macros
 
+Requires: gnome-icon-theme
+
 %description
 BusKill is a dead man's switch designed to protect your computer if it is
 physically seized. You connect one end of a USB cable to your laptop and attach

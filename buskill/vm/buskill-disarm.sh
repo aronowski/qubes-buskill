@@ -18,7 +18,7 @@ ln -s /etc/buskill/buskill.lock.rules /etc/udev/rules.d/buskill.rules
 udevadm control --reload
 
 # let the user know that BusKill is now temporarily disarmed
-sudo -E -u user notify-send -t 21000 "BusKill" "Disarmed for 30 seconds" -i changes-allow
+sudo -E -u user notify-send -t 21000 "BusKill" "Disarmed for 30 seconds" -h string:image-path:/usr/share/icons/gnome/48x48/status/changes-allow.png
 
 # wait 30 seconds
 sleep 30
@@ -27,4 +27,4 @@ sleep 30
 rm /etc/udev/rules.d/buskill.rules
 ln -s /etc/buskill/buskill.rules /etc/udev/rules.d/buskill.rules
 udevadm control --reload
-sudo -E -u user notify-send -t 5000 "BusKill" "BusKill is Armed" -i changes-prevent
+sudo -E -u user notify-send -t 5000 "BusKill" "BusKill is Armed" -h string:image-path:/usr/share/icons/gnome/48x48/status/changes-prevent.png
