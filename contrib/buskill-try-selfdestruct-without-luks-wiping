@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 ################################################################################
-# File:    buskill-selfdestruct
+# File:    buskill-try-selfdestruct-without-luks-wiping
 # Purpose: Self-destruct trigger script for BusKill Kill Cord
+#          (version for diagnosis, without wiping LUKS header)
 #          For more info, see: https://buskill.in/
-# WARNING: THIS IS EXPERIMENTAL SOFTWARE THAT IS DESIGNED TO CAUSE PERMANENT,
-#          COMPLETE AND IRREVERSIBLE DATA LOSS!
 # Note   : This script will *not* execute unless it's passed the '--yes'
 #          argument. Be sure to test this trigger before depending on it!
 # Authors: Michael Altfield <michael@buskill.in>
 # Co-Auth: Kamil Aronowski <kamil.aronowski@yahoo.com>
 # Created: 2020-03-11
-# Updated: 2026-07-31
+# Updated: 2026-09-30
 # Version: 0.2
 ################################################################################
  
@@ -80,82 +79,9 @@ ${QVM_RUN} --no-gui --pass-io @USB_VM@ '/usr/bin/buskill-lock-interface-qubes.sh
 # See https://github.com/QubesOS/qubes-issues/issues/5887
 ${QVM_KILL} --all &
  
-#####################
-# WIPE LUKS VOLUMES #
-#####################
- 
-# overwrite luks headers
-${ECHO} "INFO: shredding LUKS header (plaintext metadata and keyslots with encrypted master decryption key)"
-writes=''
-oldIFS="${IFS}"
-IFS=$'\n'
-for line in $( ${LSBLK} --list --output 'UUID,FSTYPE' | ${GREP} 'crypt' ); do
- 
-  device="/dev/disk/by-uuid/`${ECHO} \"${line}\" | ${AWK} '{print \$1}'`"
-  ${ECHO} -e "\t${device}"
- 
-  ###########################
-  # OVERWRITE LUKS KEYSLOTS #
-  ###########################
- 
-  # erases all keyslots, making the LUKS container "permanently inaccessible"
-  ${CRYPTSETUP} luksErase --batch-mode "${device}" || ${HEAD} --bytes 20M /dev/urandom > ${device} &
- 
-  # store the pid of the above write tasks so we can try to wait for it to
-  # flush to disk later -- before triggering a brutal hard-shutdown
-  writes="${writes} $!"
- 
-  #####################################
-  # OVERWRITE LUKS PLAINTEXT METADATA #
-  #####################################
- 
-  luksVersion=`${OD} --skip-bytes 6 --read-bytes 2 --format d2 --endian=big --address-radix "n" "${device}"`
- 
-  # get the end byte to overwrite. For more info, see:
-  # https://security.stackexchange.com/questions/227359/how-to-determine-start-and-end-bytes-of-luks-header
-  if [[ $luksVersion -eq 1 ]]; then
-    # LUKS1: https://gitlab.com/cryptsetup/cryptsetup/-/wikis/LUKS-standard/on-disk-format.pdf
- 
-    # in LUKS1, the whole header ends at 512 * the `payload-offset`
-    # this is actually more than we need (includes keyslots), but
-    # it's the fastest/easiest to bound to fetch in LUKS1
-    payloadOffset=`${OD} --skip-bytes 104 --read-bytes 4 --format d4 --endian=big --address-radix "n" "${device}"`
-    luksEndByte=$(( 512 * ${payloadOffset} ))
- 
-  elif [[ $luksVersion -eq 2 ]]; then
-    # LUKS2: https://gitlab.com/cryptsetup/LUKS2-docs/blob/master/luks2_doc_wip.pdf
- 
-    # in LUKS2, the end of the plaintext metadata area is twice the
-    # size of the `hdr_size` field
-    hdr_size=`${OD} --skip-bytes 8 --read-bytes 8 --format d8 --endian=big --address-radix "n" "${device}"`
-    luksEndByte=$(( 2 * ${hdr_size} ))
- 
-  else
-    # version unclear; just overwrite 20 MiB
-    luksEndByte=20971520
- 
-  fi
-     
-  # finally, shred that plaintext metadata; we do this in a new file descriptor
-  # to prevent bash from truncating if ${device} is a file
-  exec 5<> "${device}"
-  ${HEAD} --bytes "${luksEndByte}" /dev/urandom >&5 &
-  writes="${writes} $!"
-  exec 5>&-
-done
-IFS="${oldIFS}"
- 
 #######################
 # WAIT ON DISK WRITES #
 #######################
- 
-# xargs is our leading/trailing whitespace trim() function
-writes=`${ECHO} "${writes}" | ${XARGS}`
- 
-# wait until all the write tasks above have completed
-# note: do *not* put quotes around this arg or the whitespace will break wait
-# note: without the conditional, wait will wait indefinitely when $writes is empty
-if [[ ${writes} ]]; then wait ${writes}; fi
  
 # clear write buffer to ensure headers overwrites are actually synced to disks
 sync; echo 3 > /proc/sys/vm/drop_caches

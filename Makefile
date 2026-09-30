@@ -20,6 +20,7 @@ install-dom0:
 	install -m 644 -D buskill/dom0/salt/buskill.top $(DESTDIR)/srv/salt/buskill.top
 	install -m 775 -D contrib/buskill-selfdestruct-diag $(DESTDIR)/usr/bin/buskill-selfdestruct-diag
 	install -m 775 -D buskill/dom0/buskill-set-trigger-to $(DESTDIR)/usr/bin/buskill-set-trigger-to
+	install -m 775 -D contrib/buskill-try-selfdestruct-without-luks-wiping $(DESTDIR)/usr/bin/buskill-try-selfdestruct-without-luks-wiping
 
 install-vm:
 	install -m 775 -D buskill/vm/buskill-disarm.sh $(DESTDIR)/usr/bin/buskill-disarm.sh

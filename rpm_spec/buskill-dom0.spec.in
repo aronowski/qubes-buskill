@@ -119,6 +119,7 @@ fi
 /usr/bin/buskill-set-trigger-to
 /usr/share/applications/buskill-disarm.desktop
 /usr/bin/buskill-selfdestruct-diag
+/usr/bin/buskill-try-selfdestruct-without-luks-wiping
 
 %changelog
 @CHANGELOG@
